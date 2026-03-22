@@ -35,3 +35,25 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# Secrets / Env
+.env
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+**/application-dev.yml
+
+# OS / Logs
+.DS_Store
+*.log
+logs/
+
+## Assistant
+codex_preset_dukku
+
+# Local docker compose overrides (personal only)
+docker-compose.local.elasticsearch.override.yml
+ai/docker-compose.local.db.override.yml
