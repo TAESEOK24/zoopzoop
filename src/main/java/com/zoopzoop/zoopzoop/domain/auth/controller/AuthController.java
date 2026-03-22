@@ -15,7 +15,7 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
-    }
+    } //테스트
 
     @GetMapping("/health")
     public ApiResponse<HealthCheckDto> health() {
