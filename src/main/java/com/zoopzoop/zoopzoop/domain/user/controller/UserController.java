@@ -1,7 +1,8 @@
-package com.zoopzoop.zoopzoop.boundedcontext.user.in;
+package com.zoopzoop.zoopzoop.domain.user.controller;
 
-import com.zoopzoop.zoopzoop.boundedcontext.user.app.UserService;
-import com.zoopzoop.zoopzoop.boundedcontext.user.entity.User;
+import com.zoopzoop.zoopzoop.domain.user.service.UserService;
+import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
+import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,8 +17,8 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping("/sample")
-    public User sample() {
-        return userService.getSampleUser();
+    @GetMapping("/health")
+    public ApiResponse<HealthCheckDto> health() {
+        return ApiResponse.ok(userService.getStatus());
     }
 }

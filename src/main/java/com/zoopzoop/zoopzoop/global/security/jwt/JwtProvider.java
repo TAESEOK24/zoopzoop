@@ -1,4 +1,4 @@
-package com.zoopzoop.zoopzoop.global.auth.jwt;
+package com.zoopzoop.zoopzoop.global.security.jwt;
 
 import org.springframework.stereotype.Component;
 
