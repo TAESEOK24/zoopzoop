@@ -1,7 +1,5 @@
 package com.zoopzoop.zoopzoop.global.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -14,12 +12,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
-
-    private final ObjectMapper objectMapper;
-
-    public SecurityExceptionHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public void commence(
@@ -43,6 +35,14 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
         response.setStatus(statusCode);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail(message)));
+        response.getWriter().write("""
+                {"resultCode":"F-1","message":"%s","data":null}
+                """.formatted(escapeJson(message)).trim());
+    }
+
+    private String escapeJson(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
     }
 }
