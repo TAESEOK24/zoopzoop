@@ -1,9 +1,15 @@
 package com.zoopzoop.zoopzoop.domain.auth.controller;
 
+import com.zoopzoop.zoopzoop.domain.auth.dto.request.LoginRequest;
+import com.zoopzoop.zoopzoop.domain.auth.dto.request.SignupRequest;
+import com.zoopzoop.zoopzoop.domain.auth.dto.response.AuthResponse;
 import com.zoopzoop.zoopzoop.domain.auth.service.AuthService;
 import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
 import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,7 +21,17 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
-    } //테스트
+    }
+
+    @PostMapping("/signup")
+    public ApiResponse<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
+        return ApiResponse.ok(authService.signup(request));
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.ok(authService.login(request));
+    }
 
     @GetMapping("/health")
     public ApiResponse<HealthCheckDto> health() {
