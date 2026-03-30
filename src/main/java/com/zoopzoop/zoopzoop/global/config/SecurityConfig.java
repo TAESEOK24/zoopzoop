@@ -37,7 +37,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/users/health",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/api/policies/**" // 🚀 추가됨: 정책 API 모두 임시 개방!
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
