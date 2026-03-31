@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: zoopzoop_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ZoopZoop_DB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sjs5382352
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+    restart: always
