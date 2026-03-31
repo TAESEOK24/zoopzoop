@@ -12,4 +12,4 @@ services:
       POSTGRES_PASSWORD: sjs5382352
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d
-    restart: always
+    restart: on-failure
