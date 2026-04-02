@@ -17,18 +17,32 @@ const Header = () => {
             </nav>
 
             <div className="flex space-x-4">
-                <Link
-                    to="/login"
-                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 flex items-center"
-                >
-                    로그인
-                </Link>
-                <Link
-                    to="/signup"
-                    className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-                >
-                    회원가입
-                </Link>
+                {localStorage.getItem('accessToken') ? (
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem('accessToken');
+                            window.location.href = '/';
+                        }}
+                        className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 flex items-center transition-colors"
+                    >
+                        로그아웃
+                    </button>
+                ) : (
+                    <>
+                        <Link
+                            to="/login"
+                            className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 flex items-center"
+                        >
+                            로그인
+                        </Link>
+                        <Link
+                            to="/signup"
+                            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        >
+                            회원가입
+                        </Link>
+                    </>
+                )}
             </div>
         </header>
     );
