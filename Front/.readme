@@ -1,0 +1,62 @@
+zoopzoop/ (최상위 폴더)
+├── client/           # React (Web) 프로젝트 폴더
+├── server/           # Spring Boot 프로젝트 폴더
+└── .gitignore        # Git 제외 설정 파일
+
+server/src/main/java/com/zoopzoop/
+├── controller/    # API 엔드포인트 정의 (정부 API 호출 트리거)
+├── service/       # 핵심 비즈니스 로직 (데이터 정제, 추천 알고리즘)
+├── repository/    # MongoDB 데이터 접근 (Spring Data MongoDB)
+├── entity/        # DB 테이블 구조 (Domain 모델)
+├── dto/           # 데이터 전송 객체 (API 응답 규격 - **수정 편의성 핵심**)
+└── config/        # Swagger, Security, Cors 설정
+
+client/src/
+├── api/           # Axios 등 백엔드 통신 함수 모음
+├── components/
+│   ├── common/    # Button, Modal, Card (공통 부품)
+│   └── layout/    # Header, Footer, AdminSidebar
+├── hooks/         # 커스텀 훅 (필터링 로직, 데이터 로드 로직)
+├── pages/         # 실제 페이지 (Main, Admin, Search)
+│   ├── Main/
+│   │   ├── index.jsx
+│   │   └── HeroSection.jsx
+│   └── Admin/
+├── styles/        # Tailwind CSS 또는 Global CSS
+└── utils/         # 날짜 계산, 텍스트 포맷팅 등 공용 함수
+
+zoopzoop/
+├── .gitignore              # Git에 올리지 않을 파일 설정 (node_modules, .idea 등)
+├── README.md               # 프로젝트 실행 방법 및 설명
+│
+├── client/                 # [Front-end] React 프로젝트 (UI 담당자 주력 공간)
+│   ├── public/             # favicon, index.html 등 정적 파일
+│   └── src/                # 리액트 소스 코드
+│       ├── api/            # API 호출 함수 (axios 등)
+│       ├── components/     # 재사용 가능한 UI 부품 (Button, Card 등)
+│       │    ├──common/     # 여러 페이지에서 공통으로 재사용할 수 있는 작은 단위의 UI 컴포넌트들이 들어가는 곳
+│       │    └──layout/     # 페이지의 전체적인 틀을 잡는 컴포넌트들이 들어가는 곳
+│       ├── hooks/          # 커스텀 훅 (로직 분리)
+│       ├── pages/          # 실제 페이지 단위 (Main, Admin, Login)
+│       ├── styles/         # CSS/Tailwind 설정
+│       └── App.js          # 라우팅(페이지 이동) 설정
+│
+└── server/                 # [Back-end] Spring Boot 프로젝트
+    ├── src/main/java/      # 자바 소스 코드
+    │   └── com/zoopzoop/     # 패키지 시작점
+    │       ├── config/     # 보안, DB, Swagger 설정
+    │       ├── controller/ # API 주소 정의 (Front와 연결되는 통로)
+    │       ├── dto/        # 데이터 전송 규격 (Request/Response 객체)
+    │       ├── entity/     # MongoDB 컬렉션 구조 (Domain)
+    │       ├── repository/ # DB 접근 인터페이스
+    │       └── service/    # 핵심 비즈니스 로직
+    └── src/main/resources/ # 설정 파일 (application.yml, DB 접속 정보)
+
+파일 설치법
+cd client로 경로 지정
+npm install --legacy-peer-deps
+오류시 npm install ajv ajv-keywords --save-dev
+실행법 npm start
+
+현재 있는 버그
+npm audit fix나 npm audit fix -force를 활용하는 경우 npm 파일 자체가 망가지는 버그
