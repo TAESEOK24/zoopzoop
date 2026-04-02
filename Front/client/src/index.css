@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 여기에 추가하고 싶은 공통 스타일을 넣으셔도 됩니다. */
+body {
+    margin: 0;
+    font-family: 'Pretendard', sans-serif; /* 한국어 폰트 추천 */
+}
