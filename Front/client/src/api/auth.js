@@ -12,9 +12,12 @@ const authApi = axios.create({
 // 로그인 요청
 export const loginAPI = async (email, password) => {
     try {
+        console.log(`[API Request] POST ${API_BASE_URL}/auth/login`, { email, password });
         const response = await authApi.post('/login', { email, password });
+        console.log(`[API Response] POST /auth/login 성공:`, response.data);
         return response.data;
     } catch (error) {
+        console.error(`[API Error] POST /auth/login 에러:`, error);
         throw error;
     }
 };

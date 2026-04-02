@@ -25,19 +25,22 @@ const LoginPage = () => {
         setIsLoading(true);
         try {
             const result = await loginAPI(formData.email, formData.password);
-            // Assuming response contains data with accessToken. fallback to result itself if not nested.
+            
+            // Spring Boot backend AuthResponse has accessToken inside data, or directly
+            // AuthResponse: { accessToken, tokenType, user } inside ApiResponse: { data, message, resultCode }
             const token = result?.data?.accessToken || result?.accessToken; 
             
             if (token) {
                 localStorage.setItem('accessToken', token);
+                window.dispatchEvent(new Event('loginStateChange')); // 로그인 상태 변경 알림
+            } else {
+                console.warn('[LoginPage] 토큰을 응답에서 찾을 수 없습니다.', result);
             }
-            
-            // Optionally store user info 
-            // localStorage.setItem('userInfo', JSON.stringify(result?.data));
 
-            // 로그인 성공 시 메인 페이지로 이동 (전체 새로고침을 통해 Header 상태도 갱신되도록)
-            window.location.href = '/';
+            // SPA 네비게이션을 사용하여 XHR 로그가 날아가지 않도록 navigate 사용
+            navigate('/');
         } catch (err) {
+            console.error('[LoginPage] 로그인 에러:', err);
             setError(err.response?.data?.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
         } finally {
             setIsLoading(false);

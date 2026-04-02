@@ -1,7 +1,28 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Header = () => {
+    const navigate = useNavigate();
+    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
+
+    useEffect(() => {
+        const handleStateChange = () => setIsLoggedIn(!!localStorage.getItem('accessToken'));
+        window.addEventListener('loginStateChange', handleStateChange);
+        // 다른 탭에서의 로그인/로그아웃 대응
+        window.addEventListener('storage', handleStateChange);
+        
+        return () => {
+            window.removeEventListener('loginStateChange', handleStateChange);
+            window.removeEventListener('storage', handleStateChange);
+        };
+    }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem('accessToken');
+        window.dispatchEvent(new Event('loginStateChange'));
+        navigate('/');
+    };
+
     return (
         <header className="flex items-center justify-between px-8 py-4 bg-white shadow-sm sticky top-0 z-40">
             {/* 로고 클릭 시 메인 화면("/")으로 이동 */}
@@ -17,12 +38,9 @@ const Header = () => {
             </nav>
 
             <div className="flex space-x-4">
-                {localStorage.getItem('accessToken') ? (
+                {isLoggedIn ? (
                     <button
-                        onClick={() => {
-                            localStorage.removeItem('accessToken');
-                            window.location.href = '/';
-                        }}
+                        onClick={handleLogout}
                         className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-blue-600 flex items-center transition-colors"
                     >
                         로그아웃
