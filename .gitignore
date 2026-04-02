@@ -35,6 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+Front/node_modules/
+Front/dist/
+Front/build/
 
 # Secrets / Env
 .env
