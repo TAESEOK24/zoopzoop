@@ -57,3 +57,6 @@ codex_preset_dukku
 # Local docker compose overrides (personal only)
 docker-compose.local.elasticsearch.override.yml
 ai/docker-compose.local.db.override.yml
+
+src/main/resources/application-local.properties
+src/main/resources/application-dev.properties
