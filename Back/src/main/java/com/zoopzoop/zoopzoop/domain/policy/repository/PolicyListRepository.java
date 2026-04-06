@@ -17,6 +17,7 @@ public interface PolicyListRepository extends JpaRepository<PolicyList, String>,
                or lower(coalesce(p.target, '')) like lower(concat('%', :keyword, '%'))
                or lower(coalesce(p.supportContent, '')) like lower(concat('%', :keyword, '%'))
                or lower(coalesce(p.applicationMethod, '')) like lower(concat('%', :keyword, '%'))
+               or lower(coalesce(p.departmentName, '')) like lower(concat('%', :keyword, '%'))
             order by p.viewCount desc, p.createdAt desc
             """)
     List<PolicyList> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
