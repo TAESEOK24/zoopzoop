@@ -13,7 +13,6 @@ function formatDisplayText(value) {
     return String(value)
         .replace(/;\s*/g, ';\n')
         .replace(/\|/g, '\n')
-        .replace(/\s*○\s*/g, '\n○ ')
         .replace(/\s+-\s+/g, '\n- ')
         .trim();
 }
@@ -23,44 +22,13 @@ function formatContactText(value) {
         return '정보 없음';
     }
 
-    const normalized = String(value).trim();
-
-    if (/^.+\s*\/\s*\d{2,4}-\d{3,4}-\d{4}$/.test(normalized)) {
-        return normalized.replace(/\s*\/\s*/, ' / ');
-    }
-
-    const parts = normalized
+    const parts = String(value)
+        .trim()
         .split(/[;|,]/)
         .map((part) => part.trim())
         .filter(Boolean);
 
-    const lines = [];
-    let pendingLabel = null;
-
-    for (const part of parts) {
-        const isPhone = /(\d{2,4}-\d{3,4}-\d{4}|\d{3,4}-\d{4}|\d{8,})/.test(part);
-
-        if (isPhone) {
-            if (pendingLabel) {
-                lines.push(`${pendingLabel} / ${part}`);
-                pendingLabel = null;
-            } else {
-                lines.push(part);
-            }
-            continue;
-        }
-
-        if (pendingLabel) {
-            lines.push(pendingLabel);
-        }
-        pendingLabel = part;
-    }
-
-    if (pendingLabel) {
-        lines.push(pendingLabel);
-    }
-
-    return lines.join('\n');
+    return parts.length > 0 ? parts.join('\n') : '정보 없음';
 }
 
 function joinValues(values) {
@@ -69,10 +37,10 @@ function joinValues(values) {
 
 function ageText(minAge, maxAge) {
     if (minAge == null && maxAge == null) {
-        return '연령 조건 정보 없음';
+        return '연령 정보 없음';
     }
     if (minAge != null && maxAge != null) {
-        return `만 ${minAge}세 ~ 만 ${maxAge}세`;
+        return `만 ${minAge}세 - 만 ${maxAge}세`;
     }
     if (minAge != null) {
         return `만 ${minAge}세 이상`;
@@ -87,12 +55,12 @@ function conditionSections(conditions) {
 
     return [
         { title: '성별', values: conditions.gender || [] },
-        { title: '소득 기준', values: conditions.income || [] },
-        { title: '대상 조건', values: conditions.lifeStage || [] },
+        { title: '소득', values: conditions.income || [] },
+        { title: '생애주기', values: conditions.lifeStage || [] },
         { title: '가구 특성', values: conditions.household || [] },
-        { title: '직업 및 사업', values: conditions.business || [] },
+        { title: '직업 및 업종', values: conditions.business || [] },
         { title: '기관 유형', values: conditions.organization || [] },
-        { title: '특수 대상', values: conditions.specialStatus || [] },
+        { title: '특수 조건', values: conditions.specialStatus || [] },
     ].filter((section) => section.values.length > 0);
 }
 
@@ -138,7 +106,7 @@ const PolicyDetailPage = () => {
         [policy]
     );
     const conditions = useMemo(() => conditionSections(policy?.conditions), [policy]);
-    const backLink = `/policies${location.search || '?page=1'}`;
+    const backLink = `/policies${location.search ? location.search : ''}`;
 
     if (isLoading) {
         return <div className="min-h-screen bg-slate-50 p-10 text-center text-slate-500">정책 상세 정보를 불러오는 중입니다.</div>;
@@ -174,7 +142,7 @@ const PolicyDetailPage = () => {
                                 </div>
                                 <h1 className="mt-4 break-words text-3xl font-black leading-tight text-slate-950 lg:text-4xl">{policy.serviceName}</h1>
                                 <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-600">
-                                    {formatDisplayText(policy.purpose || policy.purposeSummary || '정책 소개 정보가 아직 정리되지 않았습니다.')}
+                                    {formatDisplayText(policy.purpose || policy.purposeSummary || '정책 소개 정보가 없습니다.')}
                                 </p>
                             </div>
 
@@ -184,7 +152,7 @@ const PolicyDetailPage = () => {
                                     <p className="mt-2 text-xl font-black text-slate-900">{(policy.viewCount || 0).toLocaleString()}</p>
                                 </div>
                                 <div className="rounded-2xl border border-white/70 bg-white/70 px-4 py-4">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">연령 조건</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">연령</p>
                                     <p className="mt-2 text-xl font-black text-slate-900">{ageText(policy.conditions?.minAge, policy.conditions?.maxAge)}</p>
                                 </div>
                             </div>
@@ -335,7 +303,7 @@ const PolicyDetailPage = () => {
                                         </a>
                                     )}
                                     {!policy.onlineUrl && !policy.detailUrl && (
-                                        <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">외부 연결 정보가 없습니다.</div>
+                                        <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">외부 링크가 없습니다.</div>
                                     )}
                                 </div>
                             </section>
@@ -346,7 +314,7 @@ const PolicyDetailPage = () => {
                                     <div>
                                         <h2 className="text-xl font-black text-slate-950">안내</h2>
                                         <p className="mt-2 text-sm leading-6 text-slate-600">
-                                            현재 화면은 우리 DB에 적재된 정책 정보를 기반으로 표시합니다. 외부 사이트로 바로 이동시키지 않고, 필요한 경우에만 추가 링크를 제공합니다.
+                                            현재 화면은 내부 DB에 저장된 정책 정보를 기준으로 구성됩니다. 외부 링크는 존재할 때만 표시됩니다.
                                         </p>
                                     </div>
                                 </div>

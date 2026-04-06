@@ -49,3 +49,17 @@ export const fetchPolicyDetail = async (serviceId) => {
     const response = await policyApi.get(`/${serviceId}`);
     return response.data;
 };
+
+// 챗봇용 정책 검색
+export const searchPolicies = async (keyword, size = 5) => {
+    const response = await policyApi.get('/search', {
+        params: { keyword, size }
+    });
+    return response.data;
+};
+
+// 챗봇용 정책 상세 검색 (serviceId 기반)
+export const searchPolicyDetail = async (serviceId) => {
+    const response = await policyApi.get(`/search/${serviceId}`);
+    return response.data;
+};

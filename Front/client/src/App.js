@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Footer from './components/layout/Footer';
 import Header from './components/layout/Header';
+import AIChatPage from './pages/AIChat/index';
 import LoginPage from './pages/Login/index';
 import MainPage from './pages/Main/index';
 import PolicyDetailPage from './pages/Policy/Detail';
@@ -20,7 +21,7 @@ function App() {
             <Header />
             <Routes>
                 <Route path="/" element={<MainPage />} />
-                <Route path="/ai-chat" element={<EmptyPage title="AI 채팅" />} />
+                <Route path="/ai-chat" element={<AIChatPage />} />
                 <Route path="/community" element={<EmptyPage title="커뮤니티" />} />
                 <Route path="/policies" element={<PolicyPage />} />
                 <Route path="/policies/:serviceId" element={<PolicyDetailPage />} />
