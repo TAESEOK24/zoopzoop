@@ -10,7 +10,7 @@ const Header = () => {
         window.addEventListener('loginStateChange', handleStateChange);
         // 다른 탭에서의 로그인/로그아웃 대응
         window.addEventListener('storage', handleStateChange);
-        
+
         return () => {
             window.removeEventListener('loginStateChange', handleStateChange);
             window.removeEventListener('storage', handleStateChange);
@@ -34,7 +34,9 @@ const Header = () => {
                 <Link to="/ai-chat" className="hover:text-blue-500 transition-colors">AI채팅</Link>
                 <Link to="/community" className="hover:text-blue-500 transition-colors">커뮤니티</Link>
                 <Link to="/policies" className="hover:text-blue-500 transition-colors">정책목록</Link>
-                <Link to="/qna" className="hover:text-blue-500 transition-colors">질의응답</Link>
+
+                {/* 🆕 기존 /qna 질의응답을 -> /support 고객센터로 변경했습니다! */}
+                <Link to="/support" className="hover:text-blue-500 transition-colors">고객센터</Link>
             </nav>
 
             <div className="flex space-x-4">
