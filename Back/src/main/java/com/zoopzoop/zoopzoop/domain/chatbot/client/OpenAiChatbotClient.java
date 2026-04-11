@@ -1,74 +1,38 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 @Slf4j
 @Component
 public class OpenAiChatbotClient implements ChatbotAiClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final ChatClient chatClient;
 
-    @Value("${openai.api-key:}")
-    private String apiKey;
-
-    @Value("${openai.base-url:https://api.openai.com/v1}")
-    private String baseUrl;
-
-    @Value("${openai.model:gpt-5.4-nano}")
-    private String model;
+    public OpenAiChatbotClient(ChatClient.Builder chatClientBuilder) {
+        this.chatClient = chatClientBuilder.build();
+    }
 
     @Override
     public String generateAnswer(String userMessage, List<PolicySearchResultDto> policies) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new AppException(503, "OPENAI_API_KEY가 설정되지 않았습니다.");
-        }
-
-        ChatCompletionRequest request = new ChatCompletionRequest(
-                model,
-                List.of(
-                        new Message("system", buildSystemPrompt()),
-                        new Message("user", buildUserPrompt(userMessage, policies))
-                )
-        );
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
-
         try {
-            ResponseEntity<ChatCompletionResponse> response = restTemplate.exchange(
-                    baseUrl + "/chat/completions",
-                    HttpMethod.POST,
-                    new HttpEntity<>(request, headers),
-                    ChatCompletionResponse.class
-            );
+            String content = chatClient.prompt()
+                    .system(buildSystemPrompt())
+                    .user(buildUserPrompt(userMessage, policies))
+                    .call()
+                    .content();
 
-            ChatCompletionResponse body = response.getBody();
-            if (body == null || body.choices() == null || body.choices().isEmpty()) {
-                throw new AppException(502, "AI 응답을 해석할 수 없습니다.");
-            }
-
-            Choice choice = body.choices().get(0);
-            if (choice.message() == null || choice.message().content() == null || choice.message().content().isBlank()) {
+            if (content == null || content.isBlank()) {
                 throw new AppException(502, "AI 응답 내용이 비어 있습니다.");
             }
 
-            return choice.message().content().trim();
-        } catch (RestClientException exception) {
-            log.error("OpenAI request failed", exception);
+            return content.trim();
+        } catch (Exception exception) {
+            log.error("Spring AI OpenAI request failed", exception);
             throw new AppException(502, "AI 응답 생성 중 오류가 발생했습니다.");
         }
     }
@@ -107,29 +71,5 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
 
     private String nullSafe(String value) {
         return value == null || value.isBlank() ? "-" : value;
-    }
-
-    private record ChatCompletionRequest(
-            String model,
-            List<Message> messages
-    ) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ChatCompletionResponse(
-            List<Choice> choices
-    ) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record Choice(
-            Message message
-    ) {
-    }
-
-    private record Message(
-            String role,
-            String content
-    ) {
     }
 }
