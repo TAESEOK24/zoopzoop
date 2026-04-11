@@ -8,10 +8,12 @@ import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnBean(ChatClient.Builder.class)
 public class OpenAiChatbotClient implements ChatbotAiClient {
 
     private static final String FALLBACK_SUMMARY =
