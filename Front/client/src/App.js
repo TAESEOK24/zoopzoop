@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Footer from './components/layout/Footer';
 import Header from './components/layout/Header';
 import AIChatPage from './pages/AIChat/index';
+// 1️⃣ 커뮤니티 페이지 import 추가
+import CommunityPage from './pages/Community/index';
 import LoginPage from './pages/Login/index';
 import MainPage from './pages/Main/index';
 import PolicyDetailPage from './pages/Policy/Detail';
@@ -22,7 +24,10 @@ function App() {
             <Routes>
                 <Route path="/" element={<MainPage />} />
                 <Route path="/ai-chat" element={<AIChatPage />} />
-                <Route path="/community" element={<EmptyPage title="커뮤니티" />} />
+
+                {/* 2️⃣ EmptyPage를 CommunityPage로 변경 */}
+                <Route path="/community" element={<CommunityPage />} />
+
                 <Route path="/policies" element={<PolicyPage />} />
                 <Route path="/policies/:serviceId" element={<PolicyDetailPage />} />
                 <Route path="/qna" element={<EmptyPage title="질의응답" />} />
