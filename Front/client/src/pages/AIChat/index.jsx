@@ -129,9 +129,7 @@ const AIChatPage = () => {
         }
     ]);
     const [inputValue, setInputValue] = useState('');
-    const [previewList, setPreviewList] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [errorMsg, setErrorMsg] = useState(null);
     
     const messagesEndRef = useRef(null);
 
@@ -141,73 +139,57 @@ const AIChatPage = () => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, previewList, isLoading, errorMsg]);
+    }, [messages, isLoading]);
 
-    // Live search debounce
-    useEffect(() => {
-        const fetchPreview = async () => {
-            const trimmed = inputValue.trim();
-            if (trimmed.length < 2) {
-                setPreviewList(null);
-                setErrorMsg(null);
-                setIsLoading(false);
-                return;
-            }
-
-            setIsLoading(true);
-            setErrorMsg(null);
-            
-            try {
-                const res = await searchPolicies(trimmed, 5);
-                if (res && res.resultCode === 'S-1' && res.data) {
-                    setPreviewList(res.data);
-                } else {
-                    setPreviewList([]);
-                }
-            } catch (error) {
-                console.error(error);
-                setErrorMsg('정책 정보를 검색하는 중 오류가 발생했습니다.');
-                setPreviewList(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        const timer = setTimeout(() => {
-            fetchPreview();
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [inputValue]);
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const trimmed = inputValue.trim();
         if (!trimmed) return;
 
         // Apply current state to chat history
         const newUserMsg = { id: Date.now().toString(), sender: 'user', type: 'text', text: trimmed };
-        
-        let newBotMsg = null;
-        if (previewList && previewList.length > 0) {
-            newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'policy-list', data: previewList };
-        } else if (previewList && previewList.length === 0) {
-            newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: `'${trimmed}'에 대한 검색 결과가 없습니다.` };
-        } else if (errorMsg) {
-            newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: errorMsg };
-        } else if (trimmed.length < 2) {
-            newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: '검색어는 최소 2글자 이상 입력해주세요.' };
+        setMessages(prev => [...prev, newUserMsg]);
+        setInputValue('');
+
+        if (trimmed.length < 2) {
+            setMessages(prev => [...prev, { 
+                id: (Date.now() + 1).toString(), 
+                sender: 'bot', 
+                type: 'text', 
+                text: '검색어는 최소 2글자 이상 입력해주세요.' 
+            }]);
+            return;
         }
 
-        setMessages(prev => {
-            const next = [...prev, newUserMsg];
-            if (newBotMsg) next.push(newBotMsg);
-            return next;
-        });
+        setIsLoading(true);
 
-        setInputValue('');
-        setPreviewList(null);
-        setErrorMsg(null);
+        try {
+            const res = await searchPolicies(trimmed, 5);
+            let newBotMsg = null;
+            
+            if (res && res.resultCode === 'S-1' && res.data) {
+                const data = res.data;
+                if (data.length > 0) {
+                    newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'policy-list', data: data };
+                } else {
+                    newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: `'${trimmed}'에 대한 검색 결과가 없습니다.` };
+                }
+            } else {
+                newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: '정책 정보를 검색하는 중 오류가 발생했습니다.' };
+            }
+            
+            setMessages(prev => [...prev, newBotMsg]);
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => [...prev, { 
+                id: (Date.now() + 1).toString(), 
+                sender: 'bot', 
+                type: 'text', 
+                text: '정책 정보를 검색하는 중 오류가 발생했습니다.' 
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -227,20 +209,9 @@ const AIChatPage = () => {
                         <ChatMessage key={msg.id} msg={msg} />
                     ))}
                     
-                    {/* Live Preview section based on user input */}
+                    {/* Live Preview section based on user input (Now only shows loading while fetching) */}
                     {isLoading && (
                         <ChatMessage msg={{ sender: 'bot', type: 'text', text: '정책을 검색하고 있습니다...', isTyping: true }} />
-                    )}
-                    {!isLoading && errorMsg && (
-                        <ChatMessage msg={{ sender: 'bot', type: 'text', text: errorMsg }} />
-                    )}
-                    {!isLoading && inputValue.trim().length >= 2 && previewList !== null && (
-                        <ChatMessage msg={{ 
-                            sender: 'bot', 
-                            type: previewList.length > 0 ? 'policy-list' : 'text', 
-                            text: previewList.length === 0 ? `'${inputValue.trim()}'에 대한 검색 결과가 없습니다.` : undefined,
-                            data: previewList 
-                        }} />
                     )}
                     
                     <div ref={messagesEndRef} />
