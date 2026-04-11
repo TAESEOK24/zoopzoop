@@ -39,7 +39,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build & Test
-        run: ./gradlew clean build --no-daemon
+        run: ./gradlew clean build --no-daemon --stacktrace
 
       - name: Upload Test Report
         if: always()
@@ -122,3 +122,4 @@ jobs:
         uses: gradle/actions/dependency-submission@v4
         with:
           build-root-directory: Back
+
