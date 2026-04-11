@@ -6,7 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zoopzoop.zoopzoop.domain.chatbot.client.ChatbotAiClient;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAskResponse;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySearchService;
 import java.util.List;
@@ -29,40 +31,49 @@ class ChatbotServiceTest {
     private ChatbotService chatbotService;
 
     @Test
-    void askReturnsAiAnswerWhenPoliciesExist() {
+    void askReturnsAiSummaryAndPolicyCardsWhenPoliciesExist() {
         List<PolicySearchResultDto> policies = List.of(
                 new PolicySearchResultDto(
                         "svc-1",
-                        "청년 월세 지원",
-                        "주거비 부담 완화",
-                        "청년",
-                        "월세 일부 지원",
-                        "온라인 신청",
-                        "상시",
+                        "Youth Housing Support",
+                        "Supports housing costs for young adults.",
+                        "Young adults",
+                        "Rent and deposit support",
+                        "Online application",
+                        "Always open",
                         "https://example.com/policies/svc-1",
-                        "서울시",
-                        "청년정책과"
+                        "Seoul",
+                        "Youth Policy Team"
                 )
         );
 
-        when(policySearchService.searchPolicies("청년 주거 지원 알려줘", 5)).thenReturn(policies);
-        when(chatbotAiClient.generateAnswer("청년 주거 지원 알려줘", policies))
-                .thenReturn("청년 월세 지원 정책이 있습니다.");
+        when(policySearchService.searchPolicies("housing help", 3)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("housing help", policies))
+                .thenReturn(new ChatbotAiResult(
+                        "청년 주거 지원 정책을 우선 확인해 보세요.",
+                        List.of(new ChatbotRecommendationDto("svc-1", "주거비 부담 완화와 직접 관련된 정책입니다."))
+                ));
 
-        ChatbotAskResponse response = chatbotService.ask("청년 주거 지원 알려줘");
+        ChatbotAskResponse response = chatbotService.ask("housing help");
 
-        assertEquals("청년 월세 지원 정책이 있습니다.", response.answer());
+        assertEquals("청년 주거 지원 정책을 우선 확인해 보세요.", response.answer());
         assertEquals(1, response.matchedPolicyCount());
+        assertEquals(1, response.references().size());
         assertEquals("svc-1", response.references().get(0).serviceId());
+        assertEquals(1, response.policies().size());
+        assertEquals("svc-1", response.policies().get(0).serviceId());
+        assertEquals("주거비 부담 완화와 직접 관련된 정책입니다.", response.policies().get(0).recommendationReason());
     }
 
     @Test
     void askReturnsFallbackWithoutCallingAiWhenNoPoliciesFound() {
-        when(policySearchService.searchPolicies("외계인 지원 정책 있어?", 5)).thenReturn(List.of());
+        when(policySearchService.searchPolicies("unknown question", 3)).thenReturn(List.of());
 
-        ChatbotAskResponse response = chatbotService.ask("외계인 지원 정책 있어?");
+        ChatbotAskResponse response = chatbotService.ask("unknown question");
 
         assertEquals(0, response.matchedPolicyCount());
-        verify(chatbotAiClient, never()).generateAnswer("외계인 지원 정책 있어?", List.of());
+        assertEquals(0, response.policies().size());
+        assertEquals(0, response.references().size());
+        verify(chatbotAiClient, never()).generateAnswer("unknown question", List.of());
     }
 }

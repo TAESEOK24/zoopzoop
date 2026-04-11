@@ -1,5 +1,8 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
@@ -11,14 +14,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpenAiChatbotClient implements ChatbotAiClient {
 
+    private static final String FALLBACK_SUMMARY =
+            "조건에 맞는 정책만 간단히 추렸습니다. 자세한 내용은 아래 정책 목록을 확인해 주세요.";
+
     private final ChatClient chatClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OpenAiChatbotClient(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
     }
 
     @Override
-    public String generateAnswer(String userMessage, List<PolicySearchResultDto> policies) {
+    public ChatbotAiResult generateAnswer(String userMessage, List<PolicySearchResultDto> policies) {
         try {
             String content = chatClient.prompt()
                     .system(buildSystemPrompt())
@@ -27,49 +34,114 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
                     .content();
 
             if (content == null || content.isBlank()) {
-                throw new AppException(502, "AI 응답 내용이 비어 있습니다.");
+                throw new AppException(502, "AI response is empty.");
             }
 
-            return content.trim();
+            return parseAiResult(content, policies);
+        } catch (AppException exception) {
+            throw exception;
         } catch (Exception exception) {
             log.error("Spring AI OpenAI request failed", exception);
-            throw new AppException(502, "AI 응답 생성 중 오류가 발생했습니다.");
+            throw new AppException(502, "AI response generation failed.");
         }
     }
 
     private String buildSystemPrompt() {
         return """
-                당신은 복지 정책 안내 챗봇입니다.
-                반드시 제공된 정책 검색 결과만 근거로 답변하세요.
-                검색 결과에 없는 내용은 추측하지 마세요.
-                답변은 한국어로 작성하세요.
-                정책명, 지원 내용, 대상, 신청 방법을 간단히 정리하세요.
+                You are a welfare policy recommendation assistant.
+                Use only the provided policy candidates.
+                Keep the response short to reduce token usage.
+                Return JSON only with this schema:
+                {
+                  "summary": "1-2 short Korean sentences",
+                  "recommendations": [
+                    {
+                      "serviceId": "policy id",
+                      "reason": "one short Korean sentence"
+                    }
+                  ]
+                }
+                Do not include markdown.
+                Do not repeat policy details already provided.
+                Do not return more than 3 recommendations.
                 """;
     }
 
     private String buildUserPrompt(String userMessage, List<PolicySearchResultDto> policies) {
         StringBuilder builder = new StringBuilder();
-        builder.append("사용자 질문:\n")
+        builder.append("User question:\n")
                 .append(userMessage)
                 .append("\n\n")
-                .append("정책 검색 결과:\n");
+                .append("Policy candidates:\n");
 
         for (int i = 0; i < policies.size(); i++) {
             PolicySearchResultDto policy = policies.get(i);
-            builder.append(i + 1).append(". 정책명: ").append(nullSafe(policy.serviceName())).append('\n')
-                    .append("   서비스 ID: ").append(nullSafe(policy.serviceId())).append('\n')
-                    .append("   요약: ").append(nullSafe(policy.purposeSummary())).append('\n')
-                    .append("   대상: ").append(nullSafe(policy.target())).append('\n')
-                    .append("   지원 내용: ").append(nullSafe(policy.supportContent())).append('\n')
-                    .append("   신청 방법: ").append(nullSafe(policy.applicationMethod())).append('\n')
-                    .append("   상세 링크: ").append(nullSafe(policy.detailUrl())).append('\n');
+            builder.append(i + 1).append(". serviceId=").append(nullSafe(policy.serviceId())).append('\n')
+                    .append("   serviceName=").append(nullSafe(policy.serviceName())).append('\n')
+                    .append("   purposeSummary=").append(trimToLength(policy.purposeSummary(), 120)).append('\n')
+                    .append("   target=").append(trimToLength(policy.target(), 120)).append('\n')
+                    .append("   supportContent=").append(trimToLength(policy.supportContent(), 120)).append('\n')
+                    .append("   applicationMethod=").append(trimToLength(policy.applicationMethod(), 80)).append('\n');
         }
 
-        builder.append("\n위 정책만 근거로 답변하고, 관련 정책이 없다면 그 사실만 명확히 말해 주세요.");
+        builder.append("\nReturn compact JSON only. Summary max 2 sentences. Each reason max 1 sentence.");
         return builder.toString();
+    }
+
+    private ChatbotAiResult parseAiResult(String content, List<PolicySearchResultDto> policies) {
+        try {
+            ChatbotAiResult result = objectMapper.readValue(content, ChatbotAiResult.class);
+            String summary = result.summary();
+            if (summary == null || summary.isBlank()) {
+                return fallbackAiResult(policies);
+            }
+
+            List<ChatbotRecommendationDto> recommendations = result.recommendations() == null
+                    ? List.of()
+                    : result.recommendations().stream()
+                            .filter(recommendation -> recommendation.serviceId() != null && !recommendation.serviceId().isBlank())
+                            .map(recommendation -> new ChatbotRecommendationDto(
+                                    recommendation.serviceId().trim(),
+                                    sanitizeReason(recommendation.reason())
+                            ))
+                            .limit(3)
+                            .toList();
+
+            return new ChatbotAiResult(summary.trim(), recommendations);
+        } catch (Exception parseException) {
+            log.warn("Failed to parse AI response as JSON, using fallback summary");
+            return fallbackAiResult(policies);
+        }
+    }
+
+    private ChatbotAiResult fallbackAiResult(List<PolicySearchResultDto> policies) {
+        List<ChatbotRecommendationDto> recommendations = policies.stream()
+                .limit(3)
+                .map(policy -> new ChatbotRecommendationDto(
+                        policy.serviceId(),
+                        "질문과 연관도가 높아 우선 확인할 만한 정책입니다."
+                ))
+                .toList();
+
+        return new ChatbotAiResult(FALLBACK_SUMMARY, recommendations);
     }
 
     private String nullSafe(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private String trimToLength(String value, int maxLength) {
+        String sanitized = nullSafe(value);
+        if (sanitized.length() <= maxLength) {
+            return sanitized;
+        }
+        return sanitized.substring(0, maxLength) + "...";
+    }
+
+    private String sanitizeReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "질문과 연관된 정책입니다.";
+        }
+        return reason.trim();
     }
 }
