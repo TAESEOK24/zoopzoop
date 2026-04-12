@@ -7,7 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface PolicyListRepositoryCustom {
-    Page<PolicyList> searchPolicies(PolicySearchCriteria criteria, Pageable pageable);
+    Page<PolicyList> searchPolicies(PolicySearchCriteria criteria, Pageable pageable, String sort);
 
     List<String> findServiceTypes(PolicySearchCriteria criteria);
 }

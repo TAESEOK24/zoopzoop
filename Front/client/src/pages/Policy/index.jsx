@@ -4,6 +4,11 @@ import { ChevronLeft, ChevronRight, RefreshCcw, Search, X } from 'lucide-react';
 import { fetchPolicies, fetchPolicyTypes } from '../../api/policies';
 
 const PAGE_SIZE = 24;
+const sortOptions = [
+    { value: 'views', label: '조회수순' },
+    { value: 'latest', label: '최신순' },
+    { value: 'deadline', label: '마감기간순' },
+];
 const sidebarMenus = ['정책 통합검색', '지원유형별 정책', '조건별 탐색', '상세 정보 보기'];
 
 const regionHierarchy = {
@@ -82,6 +87,10 @@ function parsePage(value) {
     return Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
 }
 
+function parseSort(value) {
+    return sortOptions.some((option) => option.value === value) ? value : 'views';
+}
+
 function parseSpecial(value) {
     if (!value) {
         return [];
@@ -122,6 +131,7 @@ const PolicyPage = () => {
     const urlAge = searchParams.get('age') ?? '';
     const urlRegion = searchParams.get('region') ?? '';
     const urlSpecialValue = searchParams.get('special') ?? '';
+    const urlSort = parseSort(searchParams.get('sort'));
     const urlSpecial = useMemo(() => parseSpecial(urlSpecialValue), [urlSpecialValue]);
     const parsedRegion = useMemo(() => splitRegion(urlRegion), [urlRegion]);
     const [queryInput, setQueryInput] = useState(urlQuery);
@@ -169,6 +179,7 @@ const PolicyPage = () => {
                     special: stringifySpecial(urlSpecial),
                     page: currentPage,
                     size: PAGE_SIZE,
+                    sort: urlSort,
                 });
 
                 if (cancelled) {
@@ -201,7 +212,7 @@ const PolicyPage = () => {
         return () => {
             cancelled = true;
         };
-    }, [currentPage, urlAge, urlQuery, urlRegion, urlSpecial, urlType]);
+    }, [currentPage, urlAge, urlQuery, urlRegion, urlSort, urlSpecial, urlType]);
 
     useEffect(() => {
         let cancelled = false;
@@ -240,7 +251,7 @@ const PolicyPage = () => {
 
     const pageNumbers = useMemo(() => buildPageNumbers(pageInfo.page, pageInfo.totalPages), [pageInfo.page, pageInfo.totalPages]);
 
-    const updateUrl = ({ page = 0, query = '', type = '', age = '', region = '', special = [] }) => {
+    const updateUrl = ({ page = 0, query = '', type = '', age = '', region = '', special = [], sort = urlSort }) => {
         const nextParams = new URLSearchParams();
         nextParams.set('page', String(page + 1));
 
@@ -249,6 +260,7 @@ const PolicyPage = () => {
         if (age) nextParams.set('age', age);
         if (region) nextParams.set('region', region);
         if (special.length > 0) nextParams.set('special', stringifySpecial(special));
+        if (sort && sort !== 'views') nextParams.set('sort', sort);
 
         setSearchParams(nextParams);
     };
@@ -261,6 +273,7 @@ const PolicyPage = () => {
             age: ageInput.trim(),
             region: resolveRegion(mainRegionInput, subRegionInput),
             special: selectedSpecials,
+            sort: urlSort,
         });
     };
 
@@ -279,6 +292,7 @@ const PolicyPage = () => {
             age: ageInput.trim(),
             region: resolveRegion(mainRegionInput, subRegionInput),
             special: selectedSpecials,
+            sort: urlSort,
         });
     };
 
@@ -311,6 +325,18 @@ const PolicyPage = () => {
         updateUrl({ page: 0 });
     };
 
+    const handleSortChange = (event) => {
+        updateUrl({
+            page: 0,
+            query: urlQuery,
+            type: urlType,
+            age: urlAge,
+            region: urlRegion,
+            special: urlSpecial,
+            sort: event.target.value,
+        });
+    };
+
     const movePage = (nextPage) => {
         const boundedPage = Math.min(Math.max(nextPage, 0), Math.max(pageInfo.totalPages - 1, 0));
         updateUrl({
@@ -320,6 +346,7 @@ const PolicyPage = () => {
             age: urlAge,
             region: urlRegion,
             special: urlSpecial,
+            sort: urlSort,
         });
     };
 
@@ -363,7 +390,6 @@ const PolicyPage = () => {
                                 <div>
                                     <p className="text-sm font-semibold text-slate-500">정책 대상 기준 검색</p>
                                     <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">조건에 맞는 정책만 빠르게 찾기</h2>
-                                    <p className="mt-2 text-sm text-slate-500">나이, 지역, 특수 조건을 함께 적용해서 실제 대상 정책만 남기도록 했습니다.</p>
                                 </div>
                                 <button
                                     onClick={resetFilters}
@@ -395,7 +421,7 @@ const PolicyPage = () => {
                                         type="submit"
                                         className="h-14 rounded-full bg-[linear-gradient(135deg,#5f78ff_0%,#7e7bff_100%)] px-7 text-sm font-bold text-white shadow-[0_12px_30px_rgba(95,120,255,0.28)] transition hover:translate-y-[-1px]"
                                     >
-                                        필터 적용
+                                        검색
                                     </button>
                                 </div>
 
@@ -466,7 +492,6 @@ const PolicyPage = () => {
                                                 ))}
                                             </select>
                                         </div>
-                                        <p className="mt-3 text-xs leading-5 text-slate-400">서울, 부산 같은 광역시는 첫 번째 바만 선택하면 되고, 경기도 같은 도 단위는 두 번째 바에서 시까지 지정할 수 있습니다.</p>
                                     </div>
 
                                     <div className="rounded-[28px] border border-slate-200 bg-white p-5">
@@ -521,7 +546,20 @@ const PolicyPage = () => {
                                 <p className="text-sm font-semibold text-slate-500">검색 결과</p>
                                 <h3 className="mt-1 text-2xl font-black text-slate-950">총 {pageInfo.totalElements.toLocaleString()}개의 정책</h3>
                             </div>
-                            <div className="flex flex-wrap gap-3 text-sm">
+                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                                <label className="sr-only" htmlFor="policy-sort">정렬 기준</label>
+                                <select
+                                    id="policy-sort"
+                                    value={urlSort}
+                                    onChange={handleSortChange}
+                                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#5f78ff] focus:ring-4 focus:ring-[#dfe6ff]"
+                                >
+                                    {sortOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
                                 {selectedType && <div className="rounded-2xl border border-[#d6defd] bg-[#eef2ff] px-4 py-3 text-[#3550dc]">지원유형 {selectedType}</div>}
                                 {urlAge && <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">나이 {urlAge}세</div>}
                                 {urlRegion && <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">지역 {urlRegion}</div>}

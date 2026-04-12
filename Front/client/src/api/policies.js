@@ -8,6 +8,16 @@ const policyApi = axios.create({
     },
 });
 
+policyApi.interceptors.request.use((config) => {
+    const token = localStorage.getItem('accessToken');
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+});
+
 export const fetchPolicies = async ({
     query = '',
     type = '',
@@ -16,6 +26,7 @@ export const fetchPolicies = async ({
     special = '',
     page = 0,
     size = 6,
+    sort = 'views',
 } = {}) => {
     const response = await policyApi.get('', {
         params: {
@@ -26,6 +37,7 @@ export const fetchPolicies = async ({
             special: special || undefined,
             page,
             size,
+            sort,
         },
     });
 
