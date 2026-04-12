@@ -9,6 +9,7 @@ import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -38,7 +39,7 @@ public class PolicyListRepositoryImpl implements PolicyListRepositoryCustom {
     private EntityManager entityManager;
 
     @Override
-    public Page<PolicyList> searchPolicies(PolicySearchCriteria criteria, Pageable pageable) {
+    public Page<PolicyList> searchPolicies(PolicySearchCriteria criteria, Pageable pageable, String sort) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
         CriteriaQuery<PolicyList> query = cb.createQuery(PolicyList.class);
@@ -47,10 +48,7 @@ public class PolicyListRepositoryImpl implements PolicyListRepositoryCustom {
 
         query.select(root)
                 .where(predicates.toArray(Predicate[]::new))
-                .orderBy(
-                        cb.desc(root.get("viewCount")),
-                        cb.asc(root.get("serviceName"))
-                );
+                .orderBy(buildOrders(sort, cb, root));
 
         TypedQuery<PolicyList> typedQuery = entityManager.createQuery(query);
         typedQuery.setFirstResult((int) pageable.getOffset());
@@ -64,6 +62,29 @@ public class PolicyListRepositoryImpl implements PolicyListRepositoryCustom {
         long total = entityManager.createQuery(countQuery).getSingleResult();
 
         return new PageImpl<>(typedQuery.getResultList(), pageable, total);
+    }
+
+    private List<Order> buildOrders(String sort, CriteriaBuilder cb, Root<PolicyList> root) {
+        String normalizedSort = sort == null ? "views" : sort.trim().toLowerCase();
+
+        return switch (normalizedSort) {
+            case "latest" -> List.of(
+                    cb.desc(root.get("createdAt")),
+                    cb.asc(root.get("serviceName"))
+            );
+            case "deadline" -> List.of(
+                    cb.asc(root.get("applicationDeadline")),
+                    cb.asc(root.get("serviceName"))
+            );
+            case "views" -> List.of(
+                    cb.desc(root.get("viewCount")),
+                    cb.asc(root.get("serviceName"))
+            );
+            default -> List.of(
+                    cb.desc(root.get("viewCount")),
+                    cb.asc(root.get("serviceName"))
+            );
+        };
     }
 
     @Override

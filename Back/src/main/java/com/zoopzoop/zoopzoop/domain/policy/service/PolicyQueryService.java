@@ -46,7 +46,7 @@ public class PolicyQueryService {
     }
 
     @Transactional(readOnly = true)
-    public PolicyPageResponse getPolicies(String query, String type, Integer age, String region, String special, int page, int size) {
+    public PolicyPageResponse getPolicies(String query, String type, Integer age, String region, String special, int page, int size, String sort) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(
                 Sort.Order.desc("viewCount"),
                 Sort.Order.asc("serviceName")
@@ -60,7 +60,7 @@ public class PolicyQueryService {
                 parseSpecialCodes(special)
         );
 
-        Page<PolicyList> resultPage = policyListRepository.searchPolicies(criteria, pageable);
+        Page<PolicyList> resultPage = policyListRepository.searchPolicies(criteria, pageable, sort);
 
         List<PolicySummaryResponse> items = resultPage.getContent().stream()
                 .map(PolicySummaryResponse::from)
@@ -156,55 +156,55 @@ public class PolicyQueryService {
         List<String> organization = new ArrayList<>();
         List<String> specialStatus = new ArrayList<>();
 
-        addIfEnabled(gender, conditions.getJa0101(), "Male");
-        addIfEnabled(gender, conditions.getJa0102(), "Female");
-        addIfEnabled(income, conditions.getJa0201(), "Income 0-50%");
-        addIfEnabled(income, conditions.getJa0202(), "Income 51-75%");
-        addIfEnabled(income, conditions.getJa0203(), "Income 76-100%");
-        addIfEnabled(income, conditions.getJa0204(), "Income 101-200%");
-        addIfEnabled(income, conditions.getJa0205(), "Income 200%+");
-        addIfEnabled(lifeStage, conditions.getJa0301(), "Pregnancy");
-        addIfEnabled(lifeStage, conditions.getJa0302(), "Childbirth");
-        addIfEnabled(lifeStage, conditions.getJa0303(), "Adoption");
-        addIfEnabled(lifeStage, conditions.getJa0313(), "Elementary school");
-        addIfEnabled(lifeStage, conditions.getJa0314(), "Middle school");
-        addIfEnabled(lifeStage, conditions.getJa0315(), "High school");
-        addIfEnabled(lifeStage, conditions.getJa0316(), "University");
-        addIfEnabled(lifeStage, conditions.getJa0317(), "Job seeker");
-        addIfEnabled(lifeStage, conditions.getJa0318(), "Employed");
-        addIfEnabled(lifeStage, conditions.getJa0319(), "Self-employed");
-        addIfEnabled(lifeStage, conditions.getJa0320(), "Farmer or fisher");
-        addIfEnabled(lifeStage, conditions.getJa0326(), "Veteran");
-        addIfEnabled(lifeStage, conditions.getJa0327(), "Military");
-        addIfEnabled(lifeStage, conditions.getJa0328(), "Disabled");
-        addIfEnabled(lifeStage, conditions.getJa0329(), "Protected class");
-        addIfEnabled(lifeStage, conditions.getJa0330(), "Disease or injury");
-        addIfEnabled(lifeStage, conditions.getJa0322(), "No restriction");
-        addIfEnabled(household, conditions.getJa0401(), "Multi-cultural");
-        addIfEnabled(household, conditions.getJa0402(), "North Korean defector");
-        addIfEnabled(household, conditions.getJa0403(), "Single parent");
-        addIfEnabled(household, conditions.getJa0404(), "One-person household");
-        addIfEnabled(household, conditions.getJa0411(), "Multiple children");
-        addIfEnabled(household, conditions.getJa0412(), "Homeless");
-        addIfEnabled(household, conditions.getJa0413(), "New resident");
-        addIfEnabled(household, conditions.getJa0414(), "Grandparent family");
-        addIfEnabled(household, conditions.getJa0410(), "No restriction");
-        addIfEnabled(business, conditions.getJa1101(), "Startup");
-        addIfEnabled(business, conditions.getJa1102(), "Business operation");
-        addIfEnabled(business, conditions.getJa1103(), "Management support");
-        addIfEnabled(business, conditions.getJa1201(), "Agriculture");
-        addIfEnabled(business, conditions.getJa1202(), "Manufacturing");
-        addIfEnabled(business, conditions.getJa1299(), "Other industry");
-        addIfEnabled(organization, conditions.getJa2101(), "SME");
-        addIfEnabled(organization, conditions.getJa2102(), "Social welfare");
-        addIfEnabled(organization, conditions.getJa2103(), "Agency");
-        addIfEnabled(organization, conditions.getJa2201(), "Private sector");
-        addIfEnabled(organization, conditions.getJa2202(), "Education");
-        addIfEnabled(organization, conditions.getJa2203(), "IT");
-        addIfEnabled(organization, conditions.getJa2299(), "Other organization");
-        addIfEnabled(specialStatus, conditions.getJa0328(), "Disabled");
-        addIfEnabled(specialStatus, conditions.getJa0329(), "Protected class");
-        addIfEnabled(specialStatus, conditions.getJa0330(), "Disease or injury");
+        addIfEnabled(gender, conditions.getJa0101(), "남성");
+        addIfEnabled(gender, conditions.getJa0102(), "여성");
+        addIfEnabled(income, conditions.getJa0201(), "중위소득 0~50%");
+        addIfEnabled(income, conditions.getJa0202(), "중위소득 51~75%");
+        addIfEnabled(income, conditions.getJa0203(), "중위소득 76~100%");
+        addIfEnabled(income, conditions.getJa0204(), "중위소득 101~200%");
+        addIfEnabled(income, conditions.getJa0205(), "중위소득 200% 초과");
+        addIfEnabled(lifeStage, conditions.getJa0301(), "예비부모/난임");
+        addIfEnabled(lifeStage, conditions.getJa0302(), "임산부");
+        addIfEnabled(lifeStage, conditions.getJa0303(), "출산/입양");
+        addIfEnabled(lifeStage, conditions.getJa0313(), "농업인");
+        addIfEnabled(lifeStage, conditions.getJa0314(), "어업인");
+        addIfEnabled(lifeStage, conditions.getJa0315(), "축산업인");
+        addIfEnabled(lifeStage, conditions.getJa0316(), "임업인");
+        addIfEnabled(lifeStage, conditions.getJa0317(), "초등학생");
+        addIfEnabled(lifeStage, conditions.getJa0318(), "중학생");
+        addIfEnabled(lifeStage, conditions.getJa0319(), "고등학생");
+        addIfEnabled(lifeStage, conditions.getJa0320(), "대학생/대학원생");
+        addIfEnabled(lifeStage, conditions.getJa0326(), "근로자/직장인");
+        addIfEnabled(lifeStage, conditions.getJa0327(), "구직자/실업자");
+        addIfEnabled(lifeStage, conditions.getJa0328(), "장애인");
+        addIfEnabled(lifeStage, conditions.getJa0329(), "국가보훈대상자");
+        addIfEnabled(lifeStage, conditions.getJa0330(), "질병/질환자");
+        addIfEnabled(lifeStage, conditions.getJa0322(), "해당사항 없음");
+        addIfEnabled(household, conditions.getJa0401(), "다문화가족");
+        addIfEnabled(household, conditions.getJa0402(), "북한이탈주민");
+        addIfEnabled(household, conditions.getJa0403(), "한부모가정/조손가정");
+        addIfEnabled(household, conditions.getJa0404(), "1인가구");
+        addIfEnabled(household, conditions.getJa0411(), "다자녀가구");
+        addIfEnabled(household, conditions.getJa0412(), "무주택세대");
+        addIfEnabled(household, conditions.getJa0413(), "신규전입");
+        addIfEnabled(household, conditions.getJa0414(), "확대가족");
+        addIfEnabled(household, conditions.getJa0410(), "해당사항 없음");
+        addIfEnabled(business, conditions.getJa1101(), "예비창업자");
+        addIfEnabled(business, conditions.getJa1102(), "영업중");
+        addIfEnabled(business, conditions.getJa1103(), "생계곤란/폐업예정자");
+        addIfEnabled(business, conditions.getJa1201(), "음식점업");
+        addIfEnabled(business, conditions.getJa1202(), "제조업");
+        addIfEnabled(business, conditions.getJa1299(), "기타업종");
+        addIfEnabled(organization, conditions.getJa2101(), "중소기업");
+        addIfEnabled(organization, conditions.getJa2102(), "사회복지시설");
+        addIfEnabled(organization, conditions.getJa2103(), "기관/단체");
+        addIfEnabled(organization, conditions.getJa2201(), "제조업");
+        addIfEnabled(organization, conditions.getJa2202(), "농업,임업 및 어업");
+        addIfEnabled(organization, conditions.getJa2203(), "정보통신업");
+        addIfEnabled(organization, conditions.getJa2299(), "기타업종");
+        addIfEnabled(specialStatus, conditions.getJa0328(), "장애인");
+        addIfEnabled(specialStatus, conditions.getJa0329(), "국가보훈대상자");
+        addIfEnabled(specialStatus, conditions.getJa0330(), "질병/질환자");
 
         income = normalizeRestrictionGroup(income, 5, false);
         lifeStage = normalizeRestrictionGroup(lifeStage, 16, isEnabled(conditions.getJa0322()));
@@ -249,7 +249,7 @@ public class PolicyQueryService {
             return values;
         }
         if (hasNoRestrictionFlag || values.size() >= totalOptions) {
-            return List.of("No restriction");
+            return List.of("제한 없음");
         }
         return values;
     }
