@@ -38,16 +38,17 @@ const CommunityPage = () => {
                     combinedData = [...(result.posts || [])];
                 }
 
-                const policyList = policyRes.data?.data?.content || policyRes.data?.data || [];
+                const policyList = policyRes?.data?.items || policyRes?.data?.content || policyRes?.data || [];
                 if (Array.isArray(policyList)) {
                     const formattedPolicies = policyList.map(p => ({
-                        id: `policy-${p.id || Math.random()}`,
+                        id: `policy-${p.serviceId || p.id}`,
+                        policyServiceId: p.serviceId,
                         type: '정책',
                         category: '공지사항',
-                        title: p.polyBizSjnm || p.title || '제목 없음',
-                        author: '정부/지자체',
-                        date: p.startDate || '-',
-                        views: p.views || 0
+                        title: p.serviceName || p.polyBizSjnm || p.title || '제목 없음',
+                        author: p.orgName || '정부/지자체',
+                        date: p.applicationDeadline || p.startDate || '-',
+                        views: p.viewCount || p.views || 0
                     }));
 
                     // 공지사항 카테고리일 때나 전체보기일 때만 정책 데이터 포함
@@ -199,7 +200,7 @@ const CommunityPage = () => {
                                 <tr><td colSpan="5" className="py-12 text-center text-gray-400">데이터 로딩 중...</td></tr>
                             ) : posts.length > 0 ? (
                                 posts.map((post) => (
-                                    <tr key={post.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/community/post/${post.id}`)}>
+                                    <tr key={post.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(post.policyServiceId ? `/policies/${post.policyServiceId}` : `/community/post/${post.id}`)}>
                                         <td className="py-4 px-4 text-center">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                                                     post.type === '정책' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'

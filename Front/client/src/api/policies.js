@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL } from './index';
 
 const policyApi = axios.create({
-    baseURL: `${API_BASE_URL}/policies`,
+    baseURL: `${API_BASE_URL}/api/policies`,
     headers: {
         'Content-Type': 'application/json',
     },
