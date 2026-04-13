@@ -18,7 +18,7 @@ const instance = axios.create({
 
 // (선택 사항) 토큰이 있다면 요청 헤더에 자동으로 포함시키는 인터셉터
 instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token'); // 프로젝트의 토큰 저장 방식에 맞게 수정
+    const token = localStorage.getItem('accessToken');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
