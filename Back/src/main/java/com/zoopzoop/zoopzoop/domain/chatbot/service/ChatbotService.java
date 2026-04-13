@@ -3,6 +3,7 @@ package com.zoopzoop.zoopzoop.domain.chatbot.service;
 import com.zoopzoop.zoopzoop.domain.chatbot.client.ChatbotAiClient;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAskResponse;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotPolicyDto;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotReferenceDto;
@@ -20,17 +21,18 @@ import org.springframework.stereotype.Service;
 public class ChatbotService {
 
     private static final int SEARCH_SIZE = 3;
-    private static final String NO_POLICY_MESSAGE =
-            "질문과 관련된 정책을 찾지 못했습니다. 대상, 지역, 상황을 조금 더 구체적으로 입력해 주세요.";
 
     private final PolicySearchService policySearchService;
     private final ChatbotAiClient chatbotAiClient;
+    private final ChatbotConversationMemory conversationMemory;
 
     public HealthCheckDto getStatus() {
         return new HealthCheckDto("chatbot", "chatbot module ready");
     }
 
-    public ChatbotAskResponse ask(String message) {
+    public ChatbotAskResponse ask(String sessionId, String message) {
+        String resolvedSessionId = conversationMemory.resolveSessionId(sessionId);
+        List<ChatbotConversationMessage> history = conversationMemory.getRecentMessages(resolvedSessionId);
         List<PolicySearchResultDto> policies = policySearchService.searchPolicies(message, SEARCH_SIZE);
         List<ChatbotReferenceDto> references = policies.stream()
                 .map(policy -> new ChatbotReferenceDto(
@@ -40,11 +42,7 @@ public class ChatbotService {
                 ))
                 .toList();
 
-        if (policies.isEmpty()) {
-            return new ChatbotAskResponse(NO_POLICY_MESSAGE, List.of(), references, 0);
-        }
-
-        ChatbotAiResult aiResult = chatbotAiClient.generateAnswer(message, policies);
+        ChatbotAiResult aiResult = chatbotAiClient.generateAnswer(message, history, policies);
         Map<String, String> reasonsByServiceId = aiResult.recommendations().stream()
                 .collect(Collectors.toMap(
                         ChatbotRecommendationDto::serviceId,
@@ -68,6 +66,15 @@ public class ChatbotService {
                 ))
                 .toList();
 
-        return new ChatbotAskResponse(aiResult.summary(), policyCards, references, policies.size());
+        conversationMemory.appendUserMessage(resolvedSessionId, message);
+        conversationMemory.appendAssistantMessage(resolvedSessionId, aiResult.summary());
+
+        return new ChatbotAskResponse(
+                resolvedSessionId,
+                aiResult.summary(),
+                policyCards,
+                references,
+                policies.size()
+        );
     }
 }

@@ -10,6 +10,7 @@ import MainPage from './pages/Main/index';
 import PolicyDetailPage from './pages/Policy/Detail';
 import PolicyPage from './pages/Policy/index';
 import SignupPage from './pages/Signup/index';
+import ChatbotWidget from './components/Chatbot/ChatbotWidget';
 import CommunityWrite from './pages/Community/Write';
 import PostDetail from './pages/Community/PostDetail';
 import CommunityEdit from './pages/Community/CommunityEdit';
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/community/edit/:id" element={<CommunityEdit />} />
             </Routes>
             <Footer />
+            <ChatbotWidget />
         </Router>
     );
 }

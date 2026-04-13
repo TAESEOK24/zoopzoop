@@ -7,3 +7,13 @@ body {
     margin: 0;
     font-family: 'Pretendard', sans-serif; /* 한국어 폰트 추천 */
 }
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
