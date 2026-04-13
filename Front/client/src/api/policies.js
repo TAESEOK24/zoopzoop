@@ -2,21 +2,21 @@ import axios from 'axios';
 import { API_BASE_URL } from './index';
 
 const policyApi = axios.create({
-    baseURL: `${API_BASE_URL}/policies`,
+    baseURL: 'http://localhost:8080/api/policies', // 🚀 8080번 백엔드로 가라고 못 박아줍니다!
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
 export const fetchPolicies = async ({
-    query = '',
-    type = '',
-    age = '',
-    region = '',
-    special = '',
-    page = 0,
-    size = 6,
-} = {}) => {
+                                        query = '',
+                                        type = '',
+                                        age = '',
+                                        region = '',
+                                        special = '',
+                                        page = 0,
+                                        size = 6,
+                                    } = {}) => {
     const response = await policyApi.get('', {
         params: {
             query: query || undefined,
