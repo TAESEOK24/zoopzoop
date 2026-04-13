@@ -1,6 +1,7 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.client;
 
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import java.util.List;
@@ -16,7 +17,11 @@ public class FallbackChatbotAiClient implements ChatbotAiClient {
             "AI 응답을 사용할 수 없어 검색 결과 기준으로 관련 정책을 정리했습니다.";
 
     @Override
-    public ChatbotAiResult generateAnswer(String userMessage, List<PolicySearchResultDto> policies) {
+    public ChatbotAiResult generateAnswer(
+            String userMessage,
+            List<ChatbotConversationMessage> history,
+            List<PolicySearchResultDto> policies
+    ) {
         List<ChatbotRecommendationDto> recommendations = policies.stream()
                 .limit(3)
                 .map(policy -> new ChatbotRecommendationDto(
