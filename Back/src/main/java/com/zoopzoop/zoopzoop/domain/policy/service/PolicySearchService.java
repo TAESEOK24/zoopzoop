@@ -7,7 +7,11 @@ import com.zoopzoop.zoopzoop.domain.policy.entity.PolicyList;
 import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyDetailRepository;
 import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyListRepository;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,10 @@ public class PolicySearchService {
 
     private static final int DEFAULT_SIZE = 5;
     private static final int MAX_SIZE = 10;
+    private static final List<String> STOP_WORDS = List.of(
+            "정책", "지원", "알려줘", "알려주세요", "추천", "찾아줘", "찾아주세요",
+            "뭐야", "뭐있어", "있어", "문의", "신청", "가능", "대상", "관련"
+    );
 
     private final PolicyListRepository policyListRepository;
     private final PolicyDetailRepository policyDetailRepository;
@@ -28,8 +36,18 @@ public class PolicySearchService {
         String normalizedKeyword = normalizeKeyword(keyword);
         int normalizedSize = normalizeSize(size);
 
-        return policyListRepository.searchByKeyword(normalizedKeyword, PageRequest.of(0, normalizedSize))
-                .stream()
+        List<PolicyList> directMatches = policyListRepository.searchByKeyword(
+                normalizedKeyword,
+                PageRequest.of(0, normalizedSize)
+        );
+
+        if (!directMatches.isEmpty()) {
+            return directMatches.stream()
+                    .map(this::toSearchResultDto)
+                    .toList();
+        }
+
+        return searchByKeywordTokens(normalizedKeyword, normalizedSize).stream()
                 .map(this::toSearchResultDto)
                 .toList();
     }
@@ -63,6 +81,36 @@ public class PolicySearchService {
         }
 
         return Math.min(size, MAX_SIZE);
+    }
+
+    private List<PolicyList> searchByKeywordTokens(String keyword, int size) {
+        List<String> tokens = extractSearchTokens(keyword);
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, PolicyList> deduplicated = new LinkedHashMap<>();
+        for (String token : tokens) {
+            List<PolicyList> matches = policyListRepository.searchByKeyword(token, PageRequest.of(0, size));
+            for (PolicyList policy : matches) {
+                deduplicated.putIfAbsent(policy.getServiceId(), policy);
+                if (deduplicated.size() >= size) {
+                    return deduplicated.values().stream().toList();
+                }
+            }
+        }
+
+        return deduplicated.values().stream().toList();
+    }
+
+    private List<String> extractSearchTokens(String keyword) {
+        return Arrays.stream(keyword.toLowerCase(Locale.ROOT).split("\\s+"))
+                .map(String::trim)
+                .filter(token -> !token.isBlank())
+                .filter(token -> token.length() >= 2)
+                .filter(token -> STOP_WORDS.stream().noneMatch(token::contains))
+                .distinct()
+                .toList();
     }
 
     private String normalizeServiceId(String serviceId) {

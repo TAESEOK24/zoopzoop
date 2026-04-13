@@ -2,8 +2,6 @@ package com.zoopzoop.zoopzoop.domain.user.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,7 +36,6 @@ public class User {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
 
