@@ -9,12 +9,11 @@ import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@ConditionalOnBean(ChatClient.Builder.class)
 public class OpenAiChatbotClient implements ChatbotAiClient {
 
     private static final String FALLBACK_SUMMARY =
@@ -23,8 +22,9 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public OpenAiChatbotClient(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public OpenAiChatbotClient(ObjectProvider<ChatClient.Builder> chatClientBuilderProvider) {
+        ChatClient.Builder chatClientBuilder = chatClientBuilderProvider.getIfAvailable();
+        this.chatClient = chatClientBuilder == null ? null : chatClientBuilder.build();
     }
 
     @Override
@@ -33,6 +33,11 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
             List<ChatbotConversationMessage> history,
             List<PolicySearchResultDto> policies
     ) {
+        if (chatClient == null) {
+            log.warn("ChatClient.Builder bean is not available. Using fallback chatbot response.");
+            return fallbackAiResult(policies);
+        }
+
         try {
             String content = chatClient.prompt()
                     .system(buildSystemPrompt())
