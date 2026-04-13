@@ -10,6 +10,7 @@ import MainPage from './pages/Main/index';
 import PolicyDetailPage from './pages/Policy/Detail';
 import PolicyPage from './pages/Policy/index';
 import SignupPage from './pages/Signup/index';
+import ChatbotWidget from './components/Chatbot/ChatbotWidget';
 
 const EmptyPage = ({ title }) => (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -35,6 +36,7 @@ function App() {
                 <Route path="/signup" element={<SignupPage />} />
             </Routes>
             <Footer />
+            <ChatbotWidget />
         </Router>
     );
 }

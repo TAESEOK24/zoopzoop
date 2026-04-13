@@ -1,191 +1,78 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bot, User, ChevronDown, ChevronUp, Send } from 'lucide-react';
-import { searchPolicies, searchPolicyDetail } from '../../api/policies';
+import React, { useState } from 'react';
+import { Bot, RotateCcw } from 'lucide-react';
+import ChatMessageList from '../../components/Chatbot/ChatMessageList';
+import ChatInput from '../../components/Chatbot/ChatInput';
+import { askChatbot } from '../../api/chatbot';
 
-const PolicyCard = ({ item }) => {
-    const [detail, setDetail] = useState(null);
-    const [expanded, setExpanded] = useState(false);
-    const [loadingDetail, setLoadingDetail] = useState(false);
-    const [errorMsg, setErrorMsg] = useState(null);
-
-    const handleDetailClick = async () => {
-        if (expanded) {
-            setExpanded(false);
-            return;
-        }
-        if (detail) {
-            setExpanded(true);
-            return;
-        }
-
-        setLoadingDetail(true);
-        setErrorMsg(null);
-        try {
-            const res = await searchPolicyDetail(item.serviceId);
-            if (res && res.resultCode === 'S-1' && res.data) {
-                setDetail(res.data);
-                setExpanded(true);
-            } else {
-                setErrorMsg('상세 정보를 불러올 수 없습니다.');
-            }
-        } catch (e) {
-            console.error(e);
-            setErrorMsg('상세 정보를 불러오는 중 오류가 발생했습니다.');
-        } finally {
-            setLoadingDetail(false);
-        }
-    };
-
-    return (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm text-sm w-full">
-            <h4 className="font-bold text-blue-700 mb-1 leading-snug">{item.serviceName}</h4>
-            <p className="text-gray-700 mb-3 text-xs leading-relaxed line-clamp-2">{item.purposeSummary}</p>
-            
-            <div className="flex flex-col gap-2">
-                <div className="text-gray-500 text-xs flex justify-between items-center">
-                    <span className="font-medium bg-gray-100 px-2 py-1 rounded text-[10px]">
-                        {item.orgName} {item.departmentName ? `> ${item.departmentName}` : ''}
-                    </span>
-                    <button 
-                        onClick={handleDetailClick}
-                        className="flex items-center text-blue-600 hover:text-blue-800 focus:outline-none transition-colors border border-blue-200 hover:border-blue-400 px-2 py-1 rounded"
-                        aria-label="상세보기"
-                        aria-expanded={expanded}
-                    >
-                        {loadingDetail ? '로딩중...' : expanded ? <><ChevronUp size={14} className="mr-1"/>접기</> : <><ChevronDown size={14} className="mr-1"/>상세보기</>}
-                    </button>
-                </div>
-                {errorMsg && <p className="text-red-500 text-xs mt-1">{errorMsg}</p>}
-                
-                {expanded && detail && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 text-gray-700 text-xs space-y-2 bg-gray-50 p-3 rounded-md">
-                        {detail.target && <p><strong>지원대상:</strong> {detail.target}</p>}
-                        {detail.supportContent && <p><strong>지원내용:</strong> {detail.supportContent}</p>}
-                        {detail.applicationMethod && <p><strong>신청방법:</strong> {detail.applicationMethod}</p>}
-                        {detail.applicationDeadline && <p><strong>신청기한:</strong> {detail.applicationDeadline}</p>}
-                        {detail.contactInfo && <p><strong>문의처:</strong> {detail.contactInfo} {detail.contactNumber ? `(${detail.contactNumber})` : ''}</p>}
-                        {detail.detailUrl && (
-                            <a href={detail.detailUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline inline-block mt-2 font-medium hover:text-blue-800">
-                                공식 홈페이지 상세 링크
-                            </a>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const ChatMessage = ({ msg }) => {
-    const isBot = msg.sender === 'bot';
-    
-    return (
-        <div className={`flex w-full mb-6 ${isBot ? 'justify-start' : 'justify-end'}`}>
-            {isBot && (
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3 flex-shrink-0 shadow-sm border border-blue-200">
-                    <Bot size={20} className="text-blue-600" />
-                </div>
-            )}
-            
-            <div className={`flex flex-col max-w-[85%] md:max-w-[75%]`}>
-                {!isBot && <span className="text-xs text-gray-500 mb-1 ml-auto mr-1">나</span>}
-                {isBot && <span className="text-xs text-blue-600 mb-1 ml-1 font-medium">정책 지킴이 AI</span>}
-                
-                <div className={`rounded-2xl px-4 py-3 shadow-sm ${
-                    msg.isTyping ? 'bg-gray-100 text-gray-500 rounded-tl-none italic' :
-                    isBot ? 'bg-white border border-gray-200 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'
-                }`}>
-                    {msg.type === 'text' && (
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
-                    )}
-                    
-                    {msg.type === 'policy-list' && (
-                        <div className="w-full">
-                            <p className="mb-4 text-sm font-semibold text-gray-800 border-b pb-2">📋 추천 정책 목록</p>
-                            {msg.data && msg.data.length > 0 ? (
-                                <div className="space-y-3">
-                                    {msg.data.map(item => (
-                                        <PolicyCard key={item.serviceId} item={item} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-gray-600">해당 키워드에 대한 정책을 찾을 수 없습니다.</p>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
+const INITIAL_MESSAGE = { 
+    id: 'welcome', 
+    sender: 'bot', 
+    answer: '안녕하세요! 정책 검색 AI 챗봇입니다.\n\n궁금하신 정책 키워드를 채팅창에 입력해보세요.\n(예: 청년 주거 지원 정책 알려줘, 장학금 지원 등)' 
 };
 
 const AIChatPage = () => {
-    const [messages, setMessages] = useState([
-        { 
-            id: 'welcome', 
-            sender: 'bot', 
-            type: 'text', 
-            text: '안녕하세요! 정책 검색 AI 챗봇입니다.\n\n궁금하신 정책 키워드를 채팅창에 입력해보세요.\n입력하시는 동안 실시간으로 관련 정책을 추천해드립니다. (예: 청년, 지원금, 일자리 등)' 
-        }
-    ]);
-    const [inputValue, setInputValue] = useState('');
+    const [messages, setMessages] = useState([INITIAL_MESSAGE]);
+    const [sessionId, setSessionId] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    
-    const messagesEndRef = useRef(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const handleReset = () => {
+        if (window.confirm('새로운 대화를 시작하시겠습니까?')) {
+            setMessages([INITIAL_MESSAGE]);
+            setSessionId(null);
+        }
     };
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, isLoading]);
+    const handleSend = async (text) => {
+        if (!text.trim() || isLoading) return;
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const trimmed = inputValue.trim();
-        if (!trimmed) return;
-
-        // Apply current state to chat history
-        const newUserMsg = { id: Date.now().toString(), sender: 'user', type: 'text', text: trimmed };
-        setMessages(prev => [...prev, newUserMsg]);
-        setInputValue('');
-
-        if (trimmed.length < 2) {
-            setMessages(prev => [...prev, { 
-                id: (Date.now() + 1).toString(), 
-                sender: 'bot', 
-                type: 'text', 
-                text: '검색어는 최소 2글자 이상 입력해주세요.' 
-            }]);
-            return;
-        }
-
+        // 1. Add User Message
+        const userMsgId = Date.now().toString();
+        setMessages(prev => [...prev, { id: userMsgId, sender: 'user', text }]);
+        
+        // 2. Add Loading Message
+        const tempBotMsgId = (Date.now() + 1).toString();
+        setMessages(prev => [...prev, { id: tempBotMsgId, sender: 'bot', isTyping: true }]);
         setIsLoading(true);
 
         try {
-            const res = await searchPolicies(trimmed, 5);
-            let newBotMsg = null;
-            
+            const res = await askChatbot({ message: text, sessionId });
+
+            // 3. Remove Loading Message
+            setMessages(prev => prev.filter(m => m.id !== tempBotMsgId));
+
             if (res && res.resultCode === 'S-1' && res.data) {
-                const data = res.data;
-                if (data.length > 0) {
-                    newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'policy-list', data: data };
-                } else {
-                    newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: `'${trimmed}'에 대한 검색 결과가 없습니다.` };
+                const { answer, policies, references, matchedPolicyCount } = res.data;
+                const newSessionId = res.data.sessionId;
+
+                // 세션 아이디 저장 (다음 요청부터 사용)
+                if (newSessionId) {
+                    setSessionId(newSessionId);
                 }
+
+                const botMsgId = (Date.now() + 2).toString();
+                
+                // 프론트 렌더링 규칙에 맞춰 그대로 상태에 저장.
+                // data.answer, policies, references 등을 분리 유지합니다.
+                setMessages(prev => [...prev, {
+                    id: botMsgId,
+                    sender: 'bot',
+                    answer: answer, // answer는 무조건 표시
+                    policies: policies || [], // policies가 비어있어도 answer를 덮어쓰지 않음
+                    references: references || [],
+                    matchedPolicyCount: matchedPolicyCount !== undefined ? matchedPolicyCount : 0
+                }]);
             } else {
-                newBotMsg = { id: (Date.now() + 1).toString(), sender: 'bot', type: 'text', text: '정책 정보를 검색하는 중 오류가 발생했습니다.' };
+                throw new Error(res?.message || 'Invalid Response');
             }
-            
-            setMessages(prev => [...prev, newBotMsg]);
         } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, { 
-                id: (Date.now() + 1).toString(), 
-                sender: 'bot', 
-                type: 'text', 
-                text: '정책 정보를 검색하는 중 오류가 발생했습니다.' 
+            console.error('Chat API Error:', error);
+            setMessages(prev => prev.filter(m => m.id !== tempBotMsgId));
+            
+            const errorMsgId = (Date.now() + 2).toString();
+            setMessages(prev => [...prev, {
+                id: errorMsgId,
+                sender: 'system',
+                text: '서버와 연결하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
             }]);
         } finally {
             setIsLoading(false);
@@ -196,51 +83,29 @@ const AIChatPage = () => {
         <div className="flex flex-col min-h-[calc(100vh-140px)] bg-gray-50 pt-20 pb-4 px-4 md:px-0">
             <div className="max-w-3xl w-full mx-auto flex flex-col flex-1 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 {/* Header */}
-                <div className="bg-blue-600 text-white p-4 text-center shrink-0 shadow-md z-10">
-                    <h2 className="text-lg font-bold flex items-center justify-center">
-                        <Bot className="mr-2" /> AI 정책 비서
-                    </h2>
-                    <p className="text-xs text-blue-100 mt-1">나에게 딱 맞는 정책을 쉽고 빠르게 찾아보세요</p>
+                <div className="bg-blue-600 text-white p-4 text-center shrink-0 shadow-md z-10 relative flex items-center justify-center">
+                    <div className="flex flex-col items-center">
+                        <h2 className="text-lg font-bold flex items-center justify-center">
+                            <Bot className="mr-2" /> AI 정책 비서
+                        </h2>
+                        <p className="text-xs text-blue-100 mt-1">나에게 딱 맞는 정책을 쉽고 빠르게 찾아보세요</p>
+                    </div>
+                    {/* Reset Button */}
+                    <button 
+                        onClick={handleReset}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-blue-700 rounded transition-colors text-white"
+                        title="새 대화 시작"
+                        aria-label="새 대화 시작"
+                    >
+                        <RotateCcw size={20} />
+                    </button>
                 </div>
 
                 {/* Chat Message List */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50">
-                    {messages.map(msg => (
-                        <ChatMessage key={msg.id} msg={msg} />
-                    ))}
-                    
-                    {/* Live Preview section based on user input (Now only shows loading while fetching) */}
-                    {isLoading && (
-                        <ChatMessage msg={{ sender: 'bot', type: 'text', text: '정책을 검색하고 있습니다...', isTyping: true }} />
-                    )}
-                    
-                    <div ref={messagesEndRef} />
-                </div>
+                <ChatMessageList messages={messages} />
 
-                {/* Input Area */}
-                <form 
-                    onSubmit={handleSubmit}
-                    className="p-4 bg-white border-t border-gray-200 shrink-0"
-                >
-                    <div className="relative flex items-center">
-                        <input
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="찾고 싶은 정책의 키워드를 입력하세요... (최소 2글자)"
-                            className="flex-1 border border-gray-300 rounded-full pl-5 pr-14 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow transition-colors bg-gray-50 focus:bg-white"
-                            aria-label="정책 키워드 입력"
-                        />
-                        <button
-                            type="submit"
-                            disabled={!inputValue.trim()}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-blue-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors hover:bg-blue-700"
-                            aria-label="메시지 전송"
-                        >
-                            <Send size={18} className="translate-x-[1px] translate-y-[1px]" />
-                        </button>
-                    </div>
-                </form>
+                {/* Chat Input */}
+                <ChatInput onSend={handleSend} disabled={isLoading} />
             </div>
         </div>
     );
