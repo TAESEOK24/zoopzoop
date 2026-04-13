@@ -10,6 +10,9 @@ import MainPage from './pages/Main/index';
 import PolicyDetailPage from './pages/Policy/Detail';
 import PolicyPage from './pages/Policy/index';
 import SignupPage from './pages/Signup/index';
+import CommunityWrite from './pages/Community/Write';
+import PostDetail from './pages/Community/PostDetail';
+import CommunityEdit from './pages/Community/CommunityEdit';
 
 const EmptyPage = ({ title }) => (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -33,6 +36,9 @@ function App() {
                 <Route path="/qna" element={<EmptyPage title="질의응답" />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/community/write" element={<CommunityWrite />} />
+                <Route path="/community/post/:id" element={<PostDetail />} />
+                <Route path="/community/edit/:id" element={<CommunityEdit />} />
             </Routes>
             <Footer />
         </Router>
