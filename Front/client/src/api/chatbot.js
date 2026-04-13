@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL } from './index';
 
 const chatbotApi = axios.create({
-    baseURL: `${API_BASE_URL}/chatbot`,
+    baseURL: `${API_BASE_URL}/api/chatbot`,
     headers: {
         'Content-Type': 'application/json',
     },

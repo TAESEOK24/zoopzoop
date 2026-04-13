@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Bot, User, ExternalLink } from 'lucide-react';
+import { Bot, ExternalLink, Volume2, Copy } from 'lucide-react';
 import PolicyCardList from './PolicyCardList';
 
 /**
@@ -12,6 +12,7 @@ import PolicyCardList from './PolicyCardList';
  * @property {Array} [references]
  * @property {boolean} [isTyping]
  * @property {number} [matchedPolicyCount]
+ * @property {string} [timestamp]
  */
 
 /**
@@ -24,6 +25,37 @@ const ChatMessageList = ({ messages }) => {
         endRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    const handleTTS = (text) => {
+        if (!text) return;
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Stop playing anything else
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ko-KR';
+            window.speechSynthesis.speak(utterance);
+        } else {
+            alert('이 브라우저에서는 음성 기능을 지원하지 않습니다.');
+        }
+    };
+
+    const handleCopy = (text) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            alert('클립보드에 복사되었습니다.');
+        }).catch(err => {
+            console.error('Clipboard error:', err);
+            alert('복사에 실패했습니다.');
+        });
+    };
+
+    const formatTime = (isoString) => {
+        if (!isoString) return '';
+        try {
+            return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) {
+            return '';
+        }
+    };
+
     return (
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 space-y-6">
             {messages.map((msg) => {
@@ -33,8 +65,9 @@ const ChatMessageList = ({ messages }) => {
                 if (isSystem) {
                     return (
                         <div key={msg.id} className="flex justify-center my-2">
-                            <div className="bg-gray-200 text-gray-600 text-[10px] px-3 py-1 rounded-full text-center max-w-[80%]">
-                                {msg.text}
+                            <div className="bg-gray-200 text-gray-600 text-[10px] px-3 py-1 rounded-full text-center max-w-[80%] flex flex-col items-center">
+                                <span>{msg.text}</span>
+                                {msg.timestamp && <span className="text-[9px] mt-0.5 opacity-70">{formatTime(msg.timestamp)}</span>}
                             </div>
                         </div>
                     );
@@ -50,11 +83,11 @@ const ChatMessageList = ({ messages }) => {
                         
                         <div className={`flex flex-col max-w-[85%]`}>
                             {!isBot && <span className="text-[10px] text-gray-500 mb-1 ml-auto mr-1">나</span>}
-                            {isBot && <span className="text-[10px] text-blue-600 mb-1 ml-1 font-medium">AI 정책비서</span>}
+                            {isBot && <span className="text-[10px] text-blue-600 mb-1 ml-1 font-bold">AI 퓨봇 비서</span>}
                             
                             <div className={`rounded-2xl px-4 py-3 shadow-sm text-sm leading-relaxed ${
                                 msg.isTyping ? 'bg-gray-100 text-gray-500 rounded-tl-none italic' :
-                                isBot ? 'bg-white border border-gray-200 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'
+                                isBot ? 'bg-white border border-gray-200 rounded-tl-none text-gray-800' : 'bg-blue-600 text-white rounded-tr-none'
                             }`}>
                                 {msg.isTyping && (
                                     <div className="flex space-x-1 py-1">
@@ -65,7 +98,7 @@ const ChatMessageList = ({ messages }) => {
                                 )}
 
                                 {!msg.isTyping && !isBot && (
-                                    <p className="whitespace-pre-wrap word-break">{msg.text}</p>
+                                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                                 )}
 
                                 {!msg.isTyping && isBot && (
@@ -104,6 +137,33 @@ const ChatMessageList = ({ messages }) => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Timestamp Component / Button Actions Area */}
+                            {msg.timestamp && !msg.isTyping && (
+                                <div className={`flex items-center mt-1.5 space-x-3 text-[11px] text-gray-400 ${isBot ? 'justify-start ml-2' : 'justify-end mr-2'}`}>
+                                    <span>{formatTime(msg.timestamp)}</span>
+                                    
+                                    {isBot && (
+                                        <div className="flex items-center space-x-2 border-l border-gray-300 pl-3">
+                                            <button 
+                                                onClick={() => handleTTS(msg.answer || msg.text)} 
+                                                className="hover:text-gray-700 flex items-center transition-colors"
+                                                title="음성으로 듣기"
+                                            >
+                                                <Volume2 size={13} className="mr-1" /> 음성
+                                            </button>
+                                            <button 
+                                                onClick={() => handleCopy(msg.answer || msg.text)} 
+                                                className="hover:text-gray-700 flex items-center transition-colors"
+                                                title="텍스트 복사"
+                                            >
+                                                <Copy size={13} className="mr-1" /> 복사
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                         </div>
                     </div>
                 );
