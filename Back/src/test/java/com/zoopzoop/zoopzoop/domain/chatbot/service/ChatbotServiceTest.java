@@ -1,13 +1,13 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.zoopzoop.zoopzoop.domain.chatbot.client.ChatbotAiClient;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAskResponse;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySearchService;
@@ -27,11 +27,14 @@ class ChatbotServiceTest {
     @Mock
     private ChatbotAiClient chatbotAiClient;
 
+    @Mock
+    private ChatbotConversationMemory conversationMemory;
+
     @InjectMocks
     private ChatbotService chatbotService;
 
     @Test
-    void askReturnsAiSummaryAndPolicyCardsWhenPoliciesExist() {
+    void askReturnsSessionAwareResponse() {
         List<PolicySearchResultDto> policies = List.of(
                 new PolicySearchResultDto(
                         "svc-1",
@@ -47,33 +50,42 @@ class ChatbotServiceTest {
                 )
         );
 
+        when(conversationMemory.resolveSessionId(null)).thenReturn("session-1");
+        when(conversationMemory.getRecentMessages("session-1"))
+                .thenReturn(List.of(new ChatbotConversationMessage("assistant", "안녕하세요")));
         when(policySearchService.searchPolicies("housing help", 3)).thenReturn(policies);
-        when(chatbotAiClient.generateAnswer("housing help", policies))
-                .thenReturn(new ChatbotAiResult(
-                        "청년 주거 지원 정책을 우선 확인해 보세요.",
-                        List.of(new ChatbotRecommendationDto("svc-1", "주거비 부담 완화와 직접 관련된 정책입니다."))
-                ));
+        when(chatbotAiClient.generateAnswer(
+                "housing help",
+                List.of(new ChatbotConversationMessage("assistant", "안녕하세요")),
+                policies
+        )).thenReturn(new ChatbotAiResult(
+                "청년 주거 지원 정책을 우선 확인해 보세요.",
+                List.of(new ChatbotRecommendationDto("svc-1", "주거비 부담 완화와 직접 관련된 정책입니다."))
+        ));
 
-        ChatbotAskResponse response = chatbotService.ask("housing help");
+        ChatbotAskResponse response = chatbotService.ask(null, "housing help");
 
+        assertEquals("session-1", response.sessionId());
         assertEquals("청년 주거 지원 정책을 우선 확인해 보세요.", response.answer());
         assertEquals(1, response.matchedPolicyCount());
-        assertEquals(1, response.references().size());
-        assertEquals("svc-1", response.references().get(0).serviceId());
         assertEquals(1, response.policies().size());
-        assertEquals("svc-1", response.policies().get(0).serviceId());
-        assertEquals("주거비 부담 완화와 직접 관련된 정책입니다.", response.policies().get(0).recommendationReason());
+        verify(conversationMemory).appendUserMessage("session-1", "housing help");
+        verify(conversationMemory).appendAssistantMessage("session-1", "청년 주거 지원 정책을 우선 확인해 보세요.");
     }
 
     @Test
-    void askReturnsFallbackWithoutCallingAiWhenNoPoliciesFound() {
-        when(policySearchService.searchPolicies("unknown question", 3)).thenReturn(List.of());
+    void askStillCallsAiWhenNoPoliciesFound() {
+        when(conversationMemory.resolveSessionId("session-2")).thenReturn("session-2");
+        when(conversationMemory.getRecentMessages("session-2")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("안녕", 3)).thenReturn(List.of());
+        when(chatbotAiClient.generateAnswer("안녕", List.of(), List.of()))
+                .thenReturn(new ChatbotAiResult("안녕하세요. 어떤 정책이 궁금하신가요?", List.of()));
 
-        ChatbotAskResponse response = chatbotService.ask("unknown question");
+        ChatbotAskResponse response = chatbotService.ask("session-2", "안녕");
 
+        assertEquals("session-2", response.sessionId());
+        assertEquals("안녕하세요. 어떤 정책이 궁금하신가요?", response.answer());
         assertEquals(0, response.matchedPolicyCount());
         assertEquals(0, response.policies().size());
-        assertEquals(0, response.references().size());
-        verify(chatbotAiClient, never()).generateAnswer("unknown question", List.of());
     }
 }

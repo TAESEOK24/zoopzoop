@@ -2,6 +2,7 @@ package com.zoopzoop.zoopzoop.domain.chatbot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Component;
 public class OpenAiChatbotClient implements ChatbotAiClient {
 
     private static final String FALLBACK_SUMMARY =
-            "조건에 맞는 정책만 간단히 추렸습니다. 자세한 내용은 아래 정책 목록을 확인해 주세요.";
+            "대화를 이어가며 도와드릴게요. 궁금한 정책 대상이나 상황을 조금 더 말씀해 주세요.";
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -27,11 +28,15 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
     }
 
     @Override
-    public ChatbotAiResult generateAnswer(String userMessage, List<PolicySearchResultDto> policies) {
+    public ChatbotAiResult generateAnswer(
+            String userMessage,
+            List<ChatbotConversationMessage> history,
+            List<PolicySearchResultDto> policies
+    ) {
         try {
             String content = chatClient.prompt()
                     .system(buildSystemPrompt())
-                    .user(buildUserPrompt(userMessage, policies))
+                    .user(buildUserPrompt(userMessage, history, policies))
                     .call()
                     .content();
 
@@ -50,12 +55,14 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
 
     private String buildSystemPrompt() {
         return """
-                You are a welfare policy recommendation assistant.
-                Use only the provided policy candidates.
-                Keep the response short to reduce token usage.
+                You are a Korean welfare policy chat assistant.
+                Continue the conversation naturally using the recent chat history.
+                If policy candidates are provided, briefly summarize them and explain why they fit.
+                If no policy candidates are provided, answer conversationally and ask a short follow-up question when helpful.
+                Keep the response concise.
                 Return JSON only with this schema:
                 {
-                  "summary": "1-2 short Korean sentences",
+                  "summary": "short Korean reply",
                   "recommendations": [
                     {
                       "serviceId": "policy id",
@@ -64,29 +71,47 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
                   ]
                 }
                 Do not include markdown.
-                Do not repeat policy details already provided.
                 Do not return more than 3 recommendations.
                 """;
     }
 
-    private String buildUserPrompt(String userMessage, List<PolicySearchResultDto> policies) {
+    private String buildUserPrompt(
+            String userMessage,
+            List<ChatbotConversationMessage> history,
+            List<PolicySearchResultDto> policies
+    ) {
         StringBuilder builder = new StringBuilder();
-        builder.append("User question:\n")
-                .append(userMessage)
-                .append("\n\n")
-                .append("Policy candidates:\n");
+        builder.append("Recent conversation:\n");
 
-        for (int i = 0; i < policies.size(); i++) {
-            PolicySearchResultDto policy = policies.get(i);
-            builder.append(i + 1).append(". serviceId=").append(nullSafe(policy.serviceId())).append('\n')
-                    .append("   serviceName=").append(nullSafe(policy.serviceName())).append('\n')
-                    .append("   purposeSummary=").append(trimToLength(policy.purposeSummary(), 120)).append('\n')
-                    .append("   target=").append(trimToLength(policy.target(), 120)).append('\n')
-                    .append("   supportContent=").append(trimToLength(policy.supportContent(), 120)).append('\n')
-                    .append("   applicationMethod=").append(trimToLength(policy.applicationMethod(), 80)).append('\n');
+        if (history.isEmpty()) {
+            builder.append("- no previous messages\n");
+        } else {
+            history.forEach(message -> builder.append("- ")
+                    .append(message.role())
+                    .append(": ")
+                    .append(trimToLength(message.content(), 140))
+                    .append('\n'));
         }
 
-        builder.append("\nReturn compact JSON only. Summary max 2 sentences. Each reason max 1 sentence.");
+        builder.append("\nCurrent user message:\n")
+                .append(userMessage)
+                .append("\n\nPolicy candidates:\n");
+
+        if (policies.isEmpty()) {
+            builder.append("- none\n");
+        } else {
+            for (int i = 0; i < policies.size(); i++) {
+                PolicySearchResultDto policy = policies.get(i);
+                builder.append(i + 1).append(". serviceId=").append(nullSafe(policy.serviceId())).append('\n')
+                        .append("   serviceName=").append(nullSafe(policy.serviceName())).append('\n')
+                        .append("   purposeSummary=").append(trimToLength(policy.purposeSummary(), 120)).append('\n')
+                        .append("   target=").append(trimToLength(policy.target(), 120)).append('\n')
+                        .append("   supportContent=").append(trimToLength(policy.supportContent(), 120)).append('\n')
+                        .append("   applicationMethod=").append(trimToLength(policy.applicationMethod(), 80)).append('\n');
+            }
+        }
+
+        builder.append("\nReturn compact JSON only.");
         return builder.toString();
     }
 

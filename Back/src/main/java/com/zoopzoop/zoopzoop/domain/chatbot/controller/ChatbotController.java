@@ -27,6 +27,6 @@ public class ChatbotController {
 
     @PostMapping("/ask")
     public ApiResponse<ChatbotAskResponse> ask(@Valid @RequestBody ChatbotAskRequest request) {
-        return ApiResponse.ok(chatbotService.ask(request.message()));
+        return ApiResponse.ok(chatbotService.ask(request.sessionId(), request.message()));
     }
 }
