@@ -81,8 +81,8 @@ public class PolicyController {
             @RequestParam(defaultValue = "100") int perPage
     ) {
         log.info("Policy sync requested. page={}, perPage={}", page, perPage);
-        String result = policySyncService.fetchAndSaveAll(page, perPage);
-        return ResponseEntity.ok(result);
+        PolicySyncService.SyncPageResult result = policySyncService.fetchAndSaveAll(page, perPage);
+        return ResponseEntity.ok(result.message());
     }
 
     @GetMapping("/sync-all")

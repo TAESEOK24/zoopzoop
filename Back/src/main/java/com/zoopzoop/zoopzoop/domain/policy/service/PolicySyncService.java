@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -39,14 +40,32 @@ public class PolicySyncService {
     @Value("${gov.api.key}")
     private String serviceKey;
 
+    @Value("${policy.sync.full.per-page:100}")
+    private int fullSyncPerPage;
+
+    @Value("${policy.sync.full.max-pages:150}")
+    private int fullSyncMaxPages;
+
+    @Value("${policy.sync.full.page-delay-millis:500}")
+    private long fullSyncPageDelayMillis;
+
+    @Value("${policy.sync.api.max-attempts:3}")
+    private int apiMaxAttempts;
+
+    @Value("${policy.sync.api.retry-delay-millis:1000}")
+    private long apiRetryDelayMillis;
+
     private static final String LIST_URL = "https://api.odcloud.kr/api/gov24/v3/serviceList";
     private static final String DETAIL_URL = "https://api.odcloud.kr/api/gov24/v3/serviceDetail";
     private static final String COND_URL = "https://api.odcloud.kr/api/gov24/v3/supportConditions";
 
     public String syncFullData() {
         int page = 1;
-        int perPage = 100;
-        int totalSaved = 0;
+        int totalListCount = 0;
+        int totalDetailCount = 0;
+        int totalConditionCount = 0;
+        Integer totalPages = null;
+        Integer expectedTotalCount = null;
 
         log.info("Starting full policy sync");
 
@@ -54,49 +73,85 @@ public class PolicySyncService {
             try {
                 log.info("Syncing page {}", page);
 
-                String result = fetchAndSaveAll(page, perPage);
-                if (result.startsWith("FAILED")) {
-                    log.error("Stopping full sync at page {}: {}", page, result);
+                SyncPageResult result = fetchAndSaveAll(page, fullSyncPerPage);
+                if (!result.success()) {
+                    log.error("Stopping full sync at page {}: {}", page, result.message());
+                    return "FAILED: stopped at page " + page
+                            + " after processing list=" + totalListCount
+                            + ", detail=" + totalDetailCount
+                            + ", conditions=" + totalConditionCount
+                            + ". cause=" + result.message();
+                }
+                if (totalPages == null && result.listTotalCount() != null) {
+                    expectedTotalCount = result.listTotalCount();
+                    totalPages = Math.max(1, (int) Math.ceil((double) result.listTotalCount() / fullSyncPerPage));
+                    if (totalPages > fullSyncMaxPages) {
+                        log.warn("Policy sync total pages {} exceeds configured max pages {}. Capping at configured max.",
+                                totalPages, fullSyncMaxPages);
+                        totalPages = fullSyncMaxPages;
+                    }
+                    log.info("Policy sync total count={}, total pages={}, perPage={}",
+                            result.listTotalCount(), totalPages, fullSyncPerPage);
+                }
+                if (result.isEmpty()) {
+                    log.info("Stopping full sync because page {} returned no policy data.", page);
                     break;
                 }
 
-                totalSaved += perPage;
+                totalListCount += result.listCount();
+                totalDetailCount += result.detailCount();
+                totalConditionCount += result.conditionCount();
                 page++;
-                Thread.sleep(500);
+                Thread.sleep(fullSyncPageDelayMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Policy sync interrupted at page {}", page);
+                return "FAILED: sync interrupted at page " + page;
             } catch (Exception e) {
                 log.error("Unexpected error during full policy sync", e);
                 return "FAILED: sync aborted at page " + page;
             }
 
-            if (page > 150) {
+            int lastPage = totalPages != null ? totalPages : fullSyncMaxPages;
+            if (page > lastPage) {
                 break;
             }
         }
 
-        log.info("Finished full policy sync. processed={}", totalSaved);
-        return "SUCCESS: synced through page " + (page - 1);
+        log.info("Finished full policy sync. expectedTotal={}, list={}, detail={}, conditions={}, pages={}",
+                expectedTotalCount, totalListCount, totalDetailCount, totalConditionCount, page - 1);
+        return "SUCCESS: synced through page " + (page - 1)
+                + ", expectedTotal=" + valueOrUnknown(expectedTotalCount)
+                + ", list=" + totalListCount
+                + ", detail=" + totalDetailCount
+                + ", conditions=" + totalConditionCount;
     }
 
     @Transactional
-    public String fetchAndSaveAll(int page, int perPage) {
+    public SyncPageResult fetchAndSaveAll(int page, int perPage) {
         try {
-            List<PolicyListDto> listDtos = fetchFromApi(LIST_URL, page, perPage, PolicyListDto.class);
-            saveList(listDtos);
+            ApiPage<PolicyListDto> listPage = fetchFromApi(LIST_URL, page, perPage, PolicyListDto.class);
+            saveList(listPage.items());
 
-            List<PolicyDetailDto> detailDtos = fetchFromApi(DETAIL_URL, page, perPage, PolicyDetailDto.class);
-            saveDetail(detailDtos);
+            ApiPage<PolicyDetailDto> detailPage = fetchFromApi(DETAIL_URL, page, perPage, PolicyDetailDto.class);
+            saveDetail(detailPage.items());
 
-            List<PolicyConditionsDto> conditionDtos = fetchFromApi(COND_URL, page, perPage, PolicyConditionsDto.class);
-            saveConditions(conditionDtos);
+            ApiPage<PolicyConditionsDto> conditionPage = fetchFromApi(COND_URL, page, perPage, PolicyConditionsDto.class);
+            saveConditions(conditionPage.items());
 
-            return "SUCCESS";
+            return SyncPageResult.success(
+                    listPage.items().size(),
+                    detailPage.items().size(),
+                    conditionPage.items().size(),
+                    listPage.totalCount()
+            );
         } catch (Exception e) {
             log.error("Policy sync failed", e);
-            return "FAILED: " + e.getMessage();
+            return SyncPageResult.failure("FAILED: " + e.getMessage());
         }
     }
 
-    private <T> List<T> fetchFromApi(String baseUrl, int page, int perPage, Class<T> clazz) throws Exception {
+    private <T> ApiPage<T> fetchFromApi(String baseUrl, int page, int perPage, Class<T> clazz) throws Exception {
         URI uri = UriComponentsBuilder.fromUriString(baseUrl)
                 .queryParam("page", page)
                 .queryParam("perPage", perPage)
@@ -104,8 +159,9 @@ public class PolicySyncService {
                 .build(true)
                 .toUri();
 
-        String response = restTemplate.getForObject(uri, String.class);
-        JsonNode dataNode = objectMapper.readTree(response).path("data");
+        String response = fetchWithRetry(uri, baseUrl, page);
+        JsonNode rootNode = objectMapper.readTree(response);
+        JsonNode dataNode = rootNode.path("data");
 
         List<T> dtos = new ArrayList<>();
         if (dataNode.isArray()) {
@@ -113,12 +169,41 @@ public class PolicySyncService {
                 dtos.add(objectMapper.treeToValue(node, clazz));
             }
         }
-        return dtos;
+        Integer totalCount = rootNode.hasNonNull("totalCount") ? rootNode.path("totalCount").asInt() : null;
+        return new ApiPage<>(dtos, totalCount);
+    }
+
+    private String fetchWithRetry(URI uri, String baseUrl, int page) throws InterruptedException {
+        int attempts = Math.max(1, apiMaxAttempts);
+
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                return restTemplate.getForObject(uri, String.class);
+            } catch (HttpClientErrorException.BadRequest e) {
+                if (!isRetryableUnknownError(e) || attempt == attempts) {
+                    throw e;
+                }
+                log.warn("Retrying policy API request after UNKNOWN response. endpoint={}, page={}, attempt={}/{}",
+                        baseUrl, page, attempt, attempts);
+                Thread.sleep(apiRetryDelayMillis);
+            }
+        }
+
+        throw new IllegalStateException("Policy API request failed without response. endpoint=" + baseUrl + ", page=" + page);
+    }
+
+    private boolean isRetryableUnknownError(HttpClientErrorException.BadRequest e) {
+        String body = e.getResponseBodyAsString();
+        return body != null && body.contains("\"code\":-999") && body.contains("\"msg\":\"UNKNOWN\"");
+    }
+
+    private String valueOrUnknown(Integer value) {
+        return value == null ? "unknown" : value.toString();
     }
 
     private void saveList(List<PolicyListDto> dtos) {
         for (PolicyListDto dto : dtos) {
-            if (dto.serviceId() == null || listRepo.existsById(dto.serviceId())) {
+            if (dto.serviceId() == null) {
                 continue;
             }
 
@@ -150,7 +235,7 @@ public class PolicySyncService {
 
     private void saveDetail(List<PolicyDetailDto> dtos) {
         for (PolicyDetailDto dto : dtos) {
-            if (dto.serviceId() == null || detailRepo.existsById(dto.serviceId())) {
+            if (dto.serviceId() == null) {
                 continue;
             }
             if (!listRepo.existsById(dto.serviceId())) {
@@ -177,7 +262,7 @@ public class PolicySyncService {
 
     private void saveConditions(List<PolicyConditionsDto> dtos) {
         for (PolicyConditionsDto dto : dtos) {
-            if (dto.serviceId() == null || conditionsRepo.existsById(dto.serviceId())) {
+            if (dto.serviceId() == null) {
                 continue;
             }
             if (!listRepo.existsById(dto.serviceId())) {
@@ -249,5 +334,32 @@ public class PolicySyncService {
         } catch (Exception e) {
             return LocalDateTime.now();
         }
+    }
+
+    public record SyncPageResult(
+            boolean success,
+            int listCount,
+            int detailCount,
+            int conditionCount,
+            Integer listTotalCount,
+            String message
+    ) {
+        static SyncPageResult success(int listCount, int detailCount, int conditionCount, Integer listTotalCount) {
+            return new SyncPageResult(true, listCount, detailCount, conditionCount, listTotalCount, "SUCCESS");
+        }
+
+        static SyncPageResult failure(String message) {
+            return new SyncPageResult(false, 0, 0, 0, null, message);
+        }
+
+        boolean isEmpty() {
+            return listCount == 0 && detailCount == 0 && conditionCount == 0;
+        }
+    }
+
+    private record ApiPage<T>(
+            List<T> items,
+            Integer totalCount
+    ) {
     }
 }
