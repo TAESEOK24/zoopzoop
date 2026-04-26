@@ -21,4 +21,15 @@ public interface PolicyListRepository extends JpaRepository<PolicyList, String>,
             order by p.viewCount desc, p.createdAt desc
             """)
     List<PolicyList> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+    List<PolicyList> findByServiceTypeContainingIgnoreCase(String serviceType, Pageable pageable);
+
+    @Query("""
+            select p
+            from PolicyList p
+            where lower(coalesce(p.orgName, '')) like lower(concat('%', :organization, '%'))
+               or lower(coalesce(p.departmentName, '')) like lower(concat('%', :organization, '%'))
+            order by p.viewCount desc, p.createdAt desc
+            """)
+    List<PolicyList> searchByOrganization(@Param("organization") String organization, Pageable pageable);
 }

@@ -29,7 +29,6 @@ public class SearchLogService {
         if (normalizedKeyword == null) {
             return;
         }
-
         save(user, normalizedKeyword, null, ACTION_SEARCH);
     }
 
