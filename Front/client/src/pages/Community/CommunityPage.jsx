@@ -1,141 +1,248 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { fetchCommunityPosts } from '../../api/community';
+import { fetchPolicies } from '../../api/policies';
 
 const CommunityPage = () => {
     const navigate = useNavigate();
 
-    // 상태 관리
     const [posts, setPosts] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
+    const [activeCategory, setActiveCategory] = useState('전체글보기');
+    const [searchInput, setSearchInput] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
-    // 페이지네이션 상태
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-
-    // 게시글 불러오는 핵심 함수
-    const loadPosts = async (page = 0, search = searchTerm) => {
-        try {
-            setLoading(true);
-            const response = await fetchCommunityPosts(search, page, 15);
-
-            // 데이터가 잘 왔는지 콘솔에 찍어보세요 (디버깅 필수!)
-            console.log("서버 응답 데이터:", response.data.data);
-
-            const result = response.data.data;
-
-            // result가 객체이므로 posts 배열을 명확히 지정!
-            if (result && result.posts) {
-                setPosts(result.posts);
-                setTotalPages(result.totalPages);
-                setCurrentPage(result.currentPage);
-            }
-        } catch (error) {
-            console.error("게시글 로딩 실패:", error);
-            setPosts([]); // 에러 시 빈 배열로 초기화
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(15);
 
     useEffect(() => {
-        loadPosts(0);
-    }, []);
+        const fetchData = async () => {
+            try {
+                setLoading(true);
 
-    // 검색 시 0페이지부터 다시 조회
-    const handleSearch = (e) => {
-        e.preventDefault();
-        loadPosts(0, searchTerm);
+                const [communityRes, policyRes] = await Promise.all([
+                    fetchCommunityPosts(searchTerm, currentPage - 1, itemsPerPage),
+                    fetchPolicies()
+                ]);
+
+                let combinedData = [];
+
+                if (communityRes.data && communityRes.data.data) {
+                    const result = communityRes.data.data;
+                    setTotalPages(result.totalPages || 1);
+                    combinedData = [...(result.posts || [])];
+                }
+
+                const policyList = policyRes?.data?.items || policyRes?.data?.content || policyRes?.data || [];
+                if (Array.isArray(policyList)) {
+                    const formattedPolicies = policyList.map(p => ({
+                        id: `policy-${p.serviceId || p.id}`,
+                        policyServiceId: p.serviceId,
+                        type: '정책',
+                        category: '공지사항',
+                        title: p.serviceName || p.polyBizSjnm || p.title || '제목 없음',
+                        author: p.orgName || '정부/지자체',
+                        date: p.applicationDeadline || p.startDate || '-',
+                        views: p.viewCount || p.views || 0
+                    }));
+
+                    if (activeCategory === '전체글보기' || activeCategory === '공지사항') {
+                        combinedData = [...combinedData, ...formattedPolicies];
+                    }
+                }
+
+                if (activeCategory !== '전체글보기' && activeCategory !== '베스트 게시물 (HOT)' && activeCategory !== '공지사항') {
+                    combinedData = combinedData.filter(post => post.category === activeCategory);
+                } else if (activeCategory === '베스트 게시물 (HOT)') {
+                    combinedData = combinedData.filter(post => (post.views || 0) >= 10);
+                }
+
+                setPosts(combinedData);
+
+            } catch (error) {
+                console.error("데이터 로드 실패:", error);
+                setPosts([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [currentPage, searchTerm, itemsPerPage, activeCategory]);
+
+    const handleCategoryClick = (category) => {
+        setActiveCategory(category);
+        setCurrentPage(1);
     };
 
-    // 번호 클릭 시 해당 페이지 조회
-    const handlePageChange = (pageNumber) => {
-        loadPosts(pageNumber, searchTerm);
-        window.scrollTo(0, 0); // 상단으로 스크롤 이동
+    const handleSearch = () => {
+        setSearchTerm(searchInput);
+        setCurrentPage(1);
+    };
+
+    // 🚀 [핵심 추가] 글쓰기 버튼 클릭 시 로그인 여부 검사
+    const handleWriteClick = () => {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            alert("로그인 후 이용할 수 있습니다.");
+            navigate('/login');
+            return;
+        }
+        navigate('/community/write');
+    };
+
+    const renderMenuItem = (name, icon = null) => {
+        const isActive = activeCategory === name;
+        return (
+            <li
+                key={name}
+                onClick={() => handleCategoryClick(name)}
+                className={`flex items-center cursor-pointer py-1 px-2 rounded-lg transition-all ${
+                    isActive
+                        ? 'font-bold text-blue-600 bg-blue-50'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'
+                }`}
+            >
+                {icon && <span className="mr-2">{icon}</span>}
+                {name}
+            </li>
+        );
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-10">
+        <div className="min-h-screen bg-gray-50 py-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row gap-8">
-
-                {/* 왼쪽 사이드바 */}
-                <div className="w-full md:w-64 space-y-4">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <aside className="w-full md:w-64 flex-shrink-0 space-y-6">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold">Z</div>
+                            <h2 className="font-bold text-gray-900">ZoopZoop 공식</h2>
+                        </div>
+                        {/* 🚀 onClick 변경됨 */}
                         <button
-                            onClick={() => navigate('/community/write')}
-                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+                            onClick={handleWriteClick}
+                            className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm"
                         >
                             글쓰기
                         </button>
                     </div>
-                </div>
 
-                {/* 오른쪽 메인 콘텐츠 */}
-                <div className="flex-1">
-                    {/* 검색창 */}
-                    <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm border border-gray-100">
-                        <form onSubmit={handleSearch} className="flex gap-2">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                        <div className="mb-6 flex">
                             <input
                                 type="text"
-                                className="flex-1 bg-gray-50 border-none rounded-xl px-5 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="제목 검색..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="게시글 검색"
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                className="w-full text-sm border border-gray-300 rounded-l-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
-                            <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold">검색</button>
-                        </form>
+                            <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1.5 rounded-r-md text-sm font-bold">검색</button>
+                        </div>
+
+                        <div className="space-y-5 text-sm">
+                            <div>
+                                <h3 className="font-bold mb-3 text-gray-900 flex items-center">
+                                    <span className="text-yellow-500 mr-2">★</span> 즐겨찾는 게시판
+                                </h3>
+                                <ul className="space-y-1 ml-1">
+                                    {renderMenuItem('전체글보기')}
+                                    {renderMenuItem('베스트 게시물 (HOT)')}
+                                </ul>
+                            </div>
+                            <div className="border-t pt-4">
+                                <h3 className="font-bold mb-3 text-gray-900">ZoopZoop 소식</h3>
+                                <ul className="space-y-1 ml-1">
+                                    {renderMenuItem('공지사항', '📄')}
+                                </ul>
+                            </div>
+                            <div className="border-t pt-4">
+                                <h3 className="font-bold mb-3 text-gray-900">커뮤니티</h3>
+                                <ul className="space-y-1 ml-1">
+                                    {renderMenuItem('자유게시판', '💬')}
+                                    {renderMenuItem('질문&답변', '❓')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <main className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[600px]">
+                    <div className="flex justify-between items-center border-b pb-4 mb-4">
+                        <h2 className="text-xl font-bold text-gray-900">{activeCategory}</h2>
+                        <select
+                            className="border border-gray-300 text-sm rounded-md px-2 py-1 outline-none cursor-pointer bg-white"
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                        >
+                            <option value={5}>5개씩</option>
+                            <option value={10}>10개씩</option>
+                            <option value={15}>15개씩</option>
+                            <option value={30}>30개씩</option>
+                            <option value={45}>45개씩</option>
+                        </select>
                     </div>
 
-                    {/* 테이블 영역 */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-400 text-sm">
-                            <tr>
-                                <th className="px-6 py-4">분류</th>
-                                <th className="px-6 py-4">제목</th>
-                                <th className="px-6 py-4 text-center">작성자</th>
-                                <th className="px-6 py-4 text-center">조회수</th>
+                    <div className="overflow-x-auto flex-1">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead>
+                            <tr className="border-b text-gray-400 font-medium">
+                                <th className="py-3 px-4 w-16 text-center">분류</th>
+                                <th className="py-3 px-4">제목</th>
+                                <th className="py-3 px-4 w-32 text-center">작성자</th>
+                                <th className="py-3 px-4 w-24 text-center">작성일</th>
+                                <th className="py-3 px-4 w-16 text-center">조회</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                             {loading ? (
-                                <tr><td colSpan="4" className="text-center py-10">로딩 중...</td></tr>
-                            ) : posts.map(post => (
-                                <tr key={post.id} className="hover:bg-gray-50 transition">
-                                    <td className="px-6 py-4 text-xs font-bold text-gray-400">{post.category}</td>
-                                    <td className="px-6 py-4">
-                                        <Link to={`/community/post/${post.id}`} className="font-bold text-gray-900 hover:text-blue-600">
-                                            {post.title}
-                                        </Link>
-                                    </td>
-                                    <td className="px-6 py-4 text-center text-sm">{post.author}</td>
-                                    <td className="px-6 py-4 text-center text-sm">{post.views}</td>
-                                </tr>
-                            ))}
+                                <tr><td colSpan="5" className="py-12 text-center text-gray-400">데이터 로딩 중...</td></tr>
+                            ) : posts.length > 0 ? (
+                                posts.map((post) => (
+                                    <tr key={post.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(post.policyServiceId ? `/policies/${post.policyServiceId}` : `/community/post/${post.id}`)}>
+                                        <td className="py-4 px-4 text-center">
+                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                                    post.type === '정책' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                    {post.category || '일반'}
+                                                </span>
+                                        </td>
+                                        <td className="py-4 px-4 text-gray-800 font-medium">{post.title}</td>
+                                        <td className="py-4 px-4 text-center text-gray-600">{post.author}</td>
+                                        <td className="py-4 px-4 text-center text-gray-400 text-xs">{post.date}</td>
+                                        <td className="py-4 px-4 text-center text-gray-400 text-xs">{post.views || 0}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="5" className="py-12 text-center text-gray-400">표시할 데이터가 없습니다.</td></tr>
+                            )}
                             </tbody>
                         </table>
-
-                        {/* 🚀 페이지네이션 버튼 디자인 */}
-                        <div className="p-6 bg-gray-50/30 flex justify-center border-t border-gray-50">
-                            <div className="flex space-x-2">
-                                {[...Array(totalPages)].map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => handlePageChange(i)}
-                                        className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm transition ${
-                                            currentPage === i
-                                                ? 'bg-blue-600 text-white shadow-md'
-                                                : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
                     </div>
-                </div>
+
+                    <div className="mt-8 flex justify-center space-x-1">
+                        {[...Array(totalPages)].map((_, i) => (
+                            <button
+                                key={i + 1}
+                                onClick={() => {
+                                    setCurrentPage(i + 1);
+                                    window.scrollTo(0, 0);
+                                }}
+                                className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-bold transition-all ${
+                                    currentPage === i + 1
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-white text-gray-400 border border-gray-200 hover:border-blue-300 hover:text-blue-500'
+                                }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                </main>
             </div>
         </div>
     );
