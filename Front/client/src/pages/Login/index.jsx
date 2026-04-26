@@ -16,7 +16,7 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!formData.email || !formData.password) {
             setError('이메일과 비밀번호를 모두 입력해주세요.');
             return;
@@ -25,13 +25,17 @@ const LoginPage = () => {
         setIsLoading(true);
         try {
             const result = await loginAPI(formData.email, formData.password);
-            
-            // Spring Boot backend AuthResponse has accessToken inside data, or directly
-            // AuthResponse: { accessToken, tokenType, user } inside ApiResponse: { data, message, resultCode }
-            const token = result?.data?.accessToken || result?.accessToken; 
-            
+
+            const token = result?.data?.accessToken || result?.accessToken;
+
             if (token) {
                 localStorage.setItem('accessToken', token);
+
+                // 🚀 [여기가 추가된 부분입니다!]
+                // 백엔드에서 넘겨주는 유저 이름(name)을 찾아서 저장하고, 만약 못 찾으면 로그인한 이메일을 대신 저장합니다.
+                const userName = result?.data?.user?.name || result?.data?.name || formData.email;
+                localStorage.setItem('userName', userName);
+
                 window.dispatchEvent(new Event('loginStateChange')); // 로그인 상태 변경 알림
             } else {
                 console.warn('[LoginPage] 토큰을 응답에서 찾을 수 없습니다.', result);
