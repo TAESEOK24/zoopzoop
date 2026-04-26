@@ -9,7 +9,6 @@ const sortOptions = [
     { value: 'latest', label: '최신순' },
     { value: 'deadline', label: '마감기간순' },
 ];
-const sidebarMenus = ['정책 통합검색', '지원유형별 정책', '조건별 탐색', '상세 정보 보기'];
 
 const regionHierarchy = {
     서울: [],
@@ -359,30 +358,7 @@ const PolicyPage = () => {
 
     return (
         <div className="min-h-screen bg-[linear-gradient(180deg,#f8f9ff_0%,#eef4ff_22%,#f8fafc_100%)]">
-            <div className="mx-auto flex max-w-7xl gap-8 px-4 py-10 lg:px-6">
-                <aside className="hidden w-64 shrink-0 lg:block">
-                    <div className="sticky top-24 overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-[0_18px_60px_rgba(92,118,255,0.12)] backdrop-blur">
-                        <div className="bg-[linear-gradient(135deg,#efe8ff_0%,#e8f2ff_100%)] px-6 py-8">
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Policy</p>
-                            <h1 className="mt-3 text-3xl font-black text-slate-900">지원유형별 정책</h1>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">DB 정책을 지역과 대상 조건까지 묶어서 바로 좁혀볼 수 있습니다.</p>
-                        </div>
-                        <nav className="space-y-1 px-4 py-5">
-                            {sidebarMenus.map((menu, index) => (
-                                <button
-                                    key={menu}
-                                    className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
-                                        index === 0 ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-600 hover:bg-slate-100'
-                                    }`}
-                                >
-                                    <span>{menu}</span>
-                                    <ChevronRight size={16} />
-                                </button>
-                            ))}
-                        </nav>
-                    </div>
-                </aside>
-
+            <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
                 <main className="min-w-0 flex-1">
                     <section className="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-[0_20px_80px_rgba(98,124,255,0.12)] backdrop-blur lg:p-8">
                         <div className="flex flex-col gap-6">

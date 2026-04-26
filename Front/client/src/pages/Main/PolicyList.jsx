@@ -1,34 +1,73 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchPolicies } from '../../api/policies';
+import { fetchPersonalizedRecommendations } from '../../api/recommendations';
 
-const PolicyList = ({ query }) => {
+const PolicyList = ({ query, isLoggedIn }) => {
     const [policies, setPolicies] = useState([]);
     const [pageInfo, setPageInfo] = useState({
         totalElements: 0,
     });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [allowPersonalized, setAllowPersonalized] = useState(true);
+    const usePersonalized = isLoggedIn && !query.trim() && allowPersonalized;
+
+    useEffect(() => {
+        if (!isLoggedIn || query.trim()) {
+            setAllowPersonalized(true);
+        }
+    }, [isLoggedIn, query]);
 
     useEffect(() => {
         let cancelled = false;
+
+        const loadDefaultPolicies = async () => {
+            const result = await fetchPolicies({ query, page: 0, size: 6 });
+            const data = result?.data;
+
+            if (cancelled) {
+                return;
+            }
+
+            setPolicies(data?.items ?? []);
+            setPageInfo({
+                totalElements: data?.totalElements ?? 0,
+            });
+        };
 
         const loadPolicies = async () => {
             setIsLoading(true);
             setError('');
 
             try {
-                const result = await fetchPolicies({ query, page: 0, size: 6 });
-                const data = result?.data;
+                if (usePersonalized) {
+                    try {
+                        const result = await fetchPersonalizedRecommendations(6);
+                        const data = result?.data;
 
-                if (cancelled) {
-                    return;
+                        if (cancelled) {
+                            return;
+                        }
+
+                        setPolicies(data?.items ?? []);
+                        setPageInfo({
+                            totalElements: data?.items?.length ?? 0,
+                        });
+                        return;
+                    } catch (err) {
+                        if (err.response?.status === 401) {
+                            localStorage.removeItem('accessToken');
+                            window.dispatchEvent(new Event('loginStateChange'));
+                            setAllowPersonalized(false);
+                            await loadDefaultPolicies();
+                            return;
+                        }
+                        throw err;
+                    }
                 }
 
-                setPolicies(data?.items ?? []);
-                setPageInfo({
-                    totalElements: data?.totalElements ?? 0,
-                });
+                await loadDefaultPolicies();
             } catch (err) {
                 if (cancelled) {
                     return;
@@ -48,7 +87,7 @@ const PolicyList = ({ query }) => {
         return () => {
             cancelled = true;
         };
-    }, [query]);
+    }, [query, usePersonalized]);
 
     if (isLoading) {
         return <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-gray-500 shadow-sm">정책 목록을 불러오는 중입니다.</div>;
@@ -64,7 +103,11 @@ const PolicyList = ({ query }) => {
 
     return (
         <div className="space-y-4">
-            <div className="text-sm text-gray-500">총 {pageInfo.totalElements.toLocaleString()}건의 정책</div>
+            <div className="text-sm text-gray-500">
+                {usePersonalized
+                    ? `회원님의 최근 관심사를 바탕으로 ${pageInfo.totalElements.toLocaleString()}건을 추천합니다.`
+                    : `총 ${pageInfo.totalElements.toLocaleString()}건의 정책`}
+            </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {policies.map((policy) => (
                     <div key={policy.serviceId} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
