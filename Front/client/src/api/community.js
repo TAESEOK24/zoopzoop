@@ -56,3 +56,11 @@ export const deleteComment = async (commentId) => {
         headers: { Authorization: `Bearer ${token}` }
     });
 };
+
+// 9. 댓글 수정 (🚀 토큰 필요)
+export const updateComment = async (commentId, data) => {
+    const token = localStorage.getItem('accessToken');
+    return axios.put(`/api/community/comments/${commentId}`, data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};

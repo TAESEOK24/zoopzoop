@@ -29,9 +29,7 @@ public class CommunityService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
 
-    /**
-     * 1. 게시글 목록 조회 (검색어 + 페이징 포함)
-     */
+    // 1. 게시글 목록 조회
     public Map<String, Object> getPosts(String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
@@ -62,9 +60,7 @@ public class CommunityService {
         return response;
     }
 
-    /**
-     * 2. 게시글 상세 조회 (조회수 증가 포함)
-     */
+    // 2. 게시글 상세 조회
     @Transactional
     public PostResponse getPost(Long id) {
         Post post = postRepository.findById(id)
@@ -84,9 +80,7 @@ public class CommunityService {
                 .build();
     }
 
-    /**
-     * 3. 새 게시글 작성
-     */
+    // 3. 새 게시글 작성
     @Transactional
     public PostResponse createPost(PostCreateRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -100,7 +94,6 @@ public class CommunityService {
             if (end != -1) parsedEmail = currentInfo.substring(start, end).trim();
         }
 
-        // 🚀 람다식 에러 방지를 위해 변하지 않는 final 변수에 담기!
         final String finalEmail = parsedEmail;
 
         if (finalEmail == null || finalEmail.isEmpty() || finalEmail.equals("anonymousUser")) {
@@ -108,7 +101,7 @@ public class CommunityService {
         }
 
         User user = userRepository.findByEmail(finalEmail)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다. 찾으려던 이메일: " + finalEmail));
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
 
@@ -124,14 +117,10 @@ public class CommunityService {
 
         Post savedPost = postRepository.save(post);
 
-        return PostResponse.builder()
-                .id(savedPost.getId())
-                .build();
+        return PostResponse.builder().id(savedPost.getId()).build();
     }
 
-    /**
-     * 4. 게시글 수정
-     */
+    // 4. 게시글 수정
     @Transactional
     public Long updatePost(Long id, PostUpdateRequest request) {
         Post post = postRepository.findById(id)
@@ -142,9 +131,7 @@ public class CommunityService {
         return id;
     }
 
-    /**
-     * 5. 게시글 삭제
-     */
+    // 5. 게시글 삭제
     @Transactional
     public void deletePost(Long id) {
         Post post = postRepository.findById(id)
@@ -153,11 +140,9 @@ public class CommunityService {
         postRepository.delete(post);
     }
 
-    // ================= 댓글 기능 (Comments) ================= //
+    // ================= 댓글 기능 ================= //
 
-    /**
-     * 6. 특정 게시글의 댓글 목록 조회
-     */
+    // 6. 댓글 목록 조회
     public List<CommentDto.Response> getComments(Long postId) {
         return commentRepository.findByPostId(postId).stream()
                 .map(comment -> CommentDto.Response.builder()
@@ -169,9 +154,7 @@ public class CommunityService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 7. 댓글 작성
-     */
+    // 7. 댓글 작성
     @Transactional
     public void addComment(Long postId, CommentDto.Request request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -185,11 +168,10 @@ public class CommunityService {
             if (end != -1) parsedEmail = currentInfo.substring(start, end).trim();
         }
 
-        // 🚀 람다식 에러 방지를 위해 변하지 않는 final 변수에 담기!
         final String finalEmail = parsedEmail;
 
         User user = userRepository.findByEmail(finalEmail)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다. 찾으려던 이메일: " + finalEmail));
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
         String today = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm"));
 
@@ -203,9 +185,16 @@ public class CommunityService {
         commentRepository.save(comment);
     }
 
-    /**
-     * 8. 댓글 삭제
-     */
+    // 🚀 [추가됨] 8. 댓글 수정
+    @Transactional
+    public void updateComment(Long commentId, CommentDto.Request request) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 댓글이 존재하지 않습니다. id=" + commentId));
+
+        comment.updateContent(request.getContent());
+    }
+
+    // 9. 댓글 삭제
     @Transactional
     public void deleteComment(Long commentId) {
         if (!commentRepository.existsById(commentId)) {

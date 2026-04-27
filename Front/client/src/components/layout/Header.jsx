@@ -19,6 +19,7 @@ const Header = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('userName');
         window.dispatchEvent(new Event('loginStateChange'));
         navigate('/');
     };
