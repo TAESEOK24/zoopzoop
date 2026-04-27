@@ -1,142 +1,249 @@
-import React, { useState, useEffect } from 'react';
-import { Bot, RotateCcw, Clock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bot, Clock, RotateCcw } from 'lucide-react';
 import ChatMessageList from '../../components/Chatbot/ChatMessageList';
 import ChatInput from '../../components/Chatbot/ChatInput';
 import ChatHistorySidebar from '../../components/Chatbot/ChatHistorySidebar';
-import { askChatbot } from '../../api/chatbot';
 
-const getInitialMessage = () => ({ 
-    id: 'welcome', 
-    sender: 'bot', 
-    answer: '안녕하세요! 복지 정책 상담형 안내 도우미입니다.\n\n현재 겪고 계신 어려움이나 궁금하신 지원 분야를 편하게 말씀해주세요. (예: 생활이 너무 힘들어, 청년 주거 지원 등)',
-    responseType: 'SMALLTALK',
+const RESPONSE_TYPES = {
+    POLICY_SEARCH: 'POLICY_SEARCH',
+    CLARIFICATION_NEEDED: 'CLARIFICATION_NEEDED',
+    SMALLTALK: 'SMALLTALK',
+    OFF_TOPIC: 'OFF_TOPIC',
+    SAFETY: 'SAFETY'
+};
+
+const normalizeMessage = (value) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const matchesAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
+
+const classifierRules = {
+    safety: [
+        /죽고\s?싶/,
+        /자살/,
+        /응급/,
+        /숨이?\s?안/,
+        /호흡이?\s?안/,
+        /너무\s?아파/,
+        /심하게\s?아파/,
+        /쓰러질\s?것\s?같/,
+        /의식이\s?흐려/
+    ],
+    clarification: [
+        /가난/,
+        /생활이?\s?너무\s?힘들/,
+        /생활이?\s?힘들/,
+        /돈이?\s?없/,
+        /월세.*힘들/,
+        /생계.*어렵/,
+        /버티기\s?힘들/,
+        /실직했/,
+        /구직\s?중/,
+        /막막/
+    ],
+    policy: [
+        /청년.*주거.*지원/,
+        /주거.*지원.*알려/,
+        /지원금.*알려/,
+        /정책.*추천/,
+        /청년.*지원/,
+        /신청\s?조건/,
+        /조건\s?더\s?보기/,
+        /주거\s?지원/,
+        /생계\s?지원/,
+        /긴급복지/
+    ],
+    smalltalk: [
+        /안녕/,
+        /반가/,
+        /고마/,
+        /감사/,
+        /하이/
+    ]
+};
+
+const classifyMockMessage = (message) => {
+    const normalized = normalizeMessage(message);
+
+    if (matchesAny(normalized, classifierRules.safety)) {
+        return RESPONSE_TYPES.SAFETY;
+    }
+    if (matchesAny(normalized, classifierRules.clarification)) {
+        return RESPONSE_TYPES.CLARIFICATION_NEEDED;
+    }
+    if (matchesAny(normalized, classifierRules.policy)) {
+        return RESPONSE_TYPES.POLICY_SEARCH;
+    }
+    if (matchesAny(normalized, classifierRules.smalltalk)) {
+        return RESPONSE_TYPES.SMALLTALK;
+    }
+    return RESPONSE_TYPES.OFF_TOPIC;
+};
+
+const buildPolicyCards = () => ([
+    {
+        serviceId: 'p1',
+        serviceName: '청년 월세 한시 특별지원',
+        purposeSummary: '청년층의 월세 부담을 줄이기 위한 주거 지원 정책입니다.',
+        target: '만 19세~34세의 독립 거주 청년',
+        supportContent: '월 최대 20만 원씩 최대 12개월 지원',
+        applicationMethod: '복지로 온라인 또는 주민센터 방문 신청',
+        applicationDeadline: '상시 또는 공고 확인',
+        detailUrl: 'https://www.bokjiro.go.kr',
+        orgName: '국토교통부',
+        departmentName: '청년주거지원과',
+        reason: '청년과 주거비 부담을 함께 언급해 주거 지원 정책으로 연결했습니다.'
+    },
+    {
+        serviceId: 'p2',
+        serviceName: '청년 전세보증금 대출 이자지원',
+        purposeSummary: '전세보증금 대출 이자 부담을 완화하는 청년 대상 정책입니다.',
+        target: '무주택 청년 가구',
+        supportContent: '전세대출 이자 일부 지원',
+        applicationMethod: '지자체 홈페이지 또는 위탁기관 신청',
+        applicationDeadline: '상시 또는 지자체 공고 확인',
+        detailUrl: 'https://www.bokjiro.go.kr',
+        orgName: '지방자치단체',
+        departmentName: '청년정책과',
+        reason: '청년 주거 안정과 직접 연결되는 정책입니다.'
+    },
+    {
+        serviceId: 'p3',
+        serviceName: '긴급복지 생계지원',
+        purposeSummary: '갑작스러운 위기 상황에 생계비를 지원하는 정책입니다.',
+        target: '실직, 소득 감소 등으로 생계가 어려운 가구',
+        supportContent: '생계비, 의료비 등 긴급 지원',
+        applicationMethod: '읍면동 주민센터 또는 보건복지상담센터 문의',
+        applicationDeadline: '수시',
+        detailUrl: 'https://www.bokjiro.go.kr',
+        orgName: '보건복지부',
+        departmentName: '긴급복지지원과',
+        reason: '생활고나 생계 곤란 표현과 연결되는 정책이라 함께 확인할 수 있습니다.'
+    }
+]);
+
+const buildMockResponse = (text, sessionId) => {
+    const responseType = classifyMockMessage(text);
+    const base = {
+        sessionId: sessionId || 'mock-session-123',
+        answer: '',
+        responseType,
+        suggestedReplies: [],
+        policies: [],
+        references: [],
+        matchedPolicyCount: 0
+    };
+
+    switch (responseType) {
+        case RESPONSE_TYPES.SAFETY:
+            return {
+                ...base,
+                answer: '지금은 정책 안내보다 즉시 도움을 받는 게 우선일 수 있어요. 응급 상황이면 119나 가까운 응급실에 바로 연락해 주세요.',
+                suggestedReplies: [
+                    { label: '긴급복지 문의', value: '긴급복지 지원 알려줘' },
+                    { label: '생계 지원 문의', value: '생계 지원 정책 알려줘' }
+                ]
+            };
+        case RESPONSE_TYPES.CLARIFICATION_NEEDED:
+            return {
+                ...base,
+                answer: '생활이 많이 부담되실 수 있겠어요. 맞는 지원 정책을 찾으려면 현재 연령대를 알려주세요.',
+                suggestedReplies: [
+                    { label: '청년', value: '청년' },
+                    { label: '중장년', value: '중장년' },
+                    { label: '혼자 거주', value: '혼자 살아요' }
+                ]
+            };
+        case RESPONSE_TYPES.POLICY_SEARCH: {
+            const policies = buildPolicyCards();
+            return {
+                ...base,
+                answer: '조건에 맞을 가능성이 있는 정책들을 찾았어요. 신청 조건과 지원 내용을 함께 확인해보세요.',
+                policies,
+                references: policies.map(({ serviceId, serviceName, detailUrl }) => ({ serviceId, serviceName, detailUrl })),
+                matchedPolicyCount: policies.length,
+                suggestedReplies: [
+                    { label: '신청 조건 더 보기', value: '신청 조건 더 보기' },
+                    { label: '주거 지원만 다시 보기', value: '주거 지원만 다시 보기' },
+                    { label: '청년 대상만 보기', value: '청년 대상만 보기' }
+                ]
+            };
+        }
+        case RESPONSE_TYPES.SMALLTALK:
+            return {
+                ...base,
+                answer: '안녕하세요. 복지 정책 안내 챗봇이에요. 궁금한 지원 분야를 말씀해 주시면 도와드릴게요.',
+                suggestedReplies: [
+                    { label: '청년 주거 지원', value: '청년 주거 지원 알려줘' },
+                    { label: '생활비 지원', value: '생활이 너무 힘들어' }
+                ]
+            };
+        default:
+            return {
+                ...base,
+                answer: '저는 복지 정책 안내 챗봇이에요. 청년, 주거, 취업, 생계 지원 같은 질문을 주시면 더 정확하게 도와드릴 수 있어요.',
+                suggestedReplies: [
+                    { label: '청년 지원', value: '청년 지원 정책 알려줘' },
+                    { label: '주거 지원', value: '주거 지원 정책 알려줘' },
+                    { label: '취업 지원', value: '취업 지원 정책 알려줘' }
+                ]
+            };
+    }
+};
+
+const getInitialMessage = () => ({
+    id: 'welcome',
+    sender: 'bot',
+    answer: '안녕하세요. 복지 정책 상담형 안내 도우미입니다.\n\n현재 겪고 계신 어려움이나 궁금하신 지원 분야를 편하게 말씀해주세요. 예: 생활이 너무 힘들어, 청년 주거 지원 알려줘',
+    responseType: RESPONSE_TYPES.SMALLTALK,
     suggestedReplies: [
         { label: '청년 주거 지원', value: '청년 주거 지원 알려줘' },
-        { label: '취업 지원금', value: '취업 지원금 알려줘' },
+        { label: '취업 지원금', value: '취업 지원 정책 알려줘' },
         { label: '긴급 생계 지원', value: '생활이 너무 힘들어' }
     ],
     timestamp: new Date().toISOString()
 });
 
-// Mock API for demonstration
-const mockAskChatbot = async (text, sessionId) => {
-    return new Promise(resolve => {
+const mockAskChatbot = async (text, sessionId) =>
+    new Promise((resolve) => {
         setTimeout(() => {
-            const data = {
-                sessionId: sessionId || 'mock-session-123',
-                answer: '',
-                responseType: 'SMALLTALK',
-                suggestedReplies: [],
-                policies: [],
-                references: [],
-                matchedPolicyCount: 0
-            };
-
-            if (text.includes('죽고') || text.includes('자살') || text.includes('포기') || text.includes('아파') || text.includes('응급')) {
-                data.responseType = 'SAFETY';
-                data.answer = '';
-                data.suggestedReplies = [
-                    { label: '긴급복지 문의', value: '긴급복지 문의' },
-                    { label: '생계 지원 문의', value: '생계 지원 문의' }
-                ];
-            } else if (text.includes('주식') || text.includes('투자') || text.includes('코인') || text.includes('똥마려워') || text.includes('날씨')) {
-                data.responseType = 'OFF_TOPIC';
-                data.answer = '저는 복지 정책 안내 챗봇이에요. 청년, 주거, 취업, 생계 지원 같은 질문을 주시면 도와드릴 수 있어요.';
-                data.suggestedReplies = [
-                    { label: '청년 지원', value: '청년 지원 알려줘' },
-                    { label: '주거 지원', value: '주거 지원 알려줘' },
-                    { label: '취업 지원', value: '취업 지원 알려줘' }
-                ];
-            } else if (text.includes('가난') || text.includes('힘들어') || text.includes('월세') || text.includes('막막해')) {
-                data.responseType = 'CLARIFICATION_NEEDED';
-                data.answer = '생활이 많이 부담되실 수 있겠어요.\n맞는 지원 정책을 찾으려면 현재 연령대를 알려주세요.';
-                data.suggestedReplies = [
-                    { label: '청년', value: '청년' },
-                    { label: '중장년', value: '중장년' },
-                    { label: '노년', value: '노년' }
-                ];
-            } else if (text.includes('청년') || text.includes('주거') || text.includes('조건 더 보기')) {
-                data.responseType = 'POLICY_SEARCH';
-                data.answer = '청년 주거비 부담을 덜 수 있는 정책들을 찾았어요.\n신청 조건과 지원 내용을 함께 확인해보세요.';
-                data.matchedPolicyCount = 3;
-                data.policies = [
-                    {
-                        serviceId: 'p1',
-                        serviceName: '청년 월세 특별지원',
-                        purposeSummary: '청년층의 주거비 부담 경감',
-                        target: '만 19세~34세 독립거주 무주택 청년',
-                        supportContent: '월 최대 20만원씩 12개월 분할 지급',
-                        applicationMethod: '복지로 온라인 신청 또는 관할 주민센터 방문',
-                        applicationDeadline: '2024.12.31 까지',
-                        detailUrl: 'https://www.bokjiro.go.kr',
-                        orgName: '국토교통부',
-                        departmentName: '주거복지지원과',
-                        reason: '입력하신 "청년", "월세" 키워드에 적합한 주거 지원 정책입니다.'
-                    },
-                    {
-                        serviceId: 'p2',
-                        serviceName: '청년 전세자금 대출 이자 지원',
-                        purposeSummary: '무주택 청년 전세자금 대출 이자 부담 완화',
-                        target: '만 19세~39세 무주택 청년 (소득기준 충족자)',
-                        supportContent: '전세보증금 대출 이자 연 최대 2% 지원',
-                        applicationMethod: '관할 지자체 홈페이지 또는 방문 신청',
-                        applicationDeadline: '상시',
-                        detailUrl: 'https://www.bokjiro.go.kr',
-                        orgName: '지방자치단체',
-                        departmentName: '청년정책과',
-                        reason: '"청년 주거" 관련하여 이자 부담을 줄일 수 있는 대안입니다.'
-                    }
-                ];
-                data.suggestedReplies = [
-                    { label: '청년 대상만 보기', value: '청년 대상만 보기' },
-                    { label: '주거 지원만 다시 보기', value: '주거 지원만 다시 보기' },
-                    { label: '신청 조건 더 보기', value: '신청 조건 더 보기' }
-                ];
-            } else {
-                data.responseType = 'SMALLTALK';
-                data.answer = '안녕하세요. 무엇을 도와드릴까요? 편하게 말씀해주시거나 아래 칩을 선택해주세요.';
-                data.suggestedReplies = [
-                    { label: '청년 주거 지원', value: '청년 주거 지원 알려줘' },
-                    { label: '생활비 지원', value: '생활이 너무 힘들어' }
-                ];
-            }
-
-            resolve({ resultCode: 'S-1', data });
-        }, 1000);
+            resolve({
+                resultCode: 'S-1',
+                data: buildMockResponse(text, sessionId)
+            });
+        }, 500);
     });
-};
 
 const AIChatPage = () => {
     const [messages, setMessages] = useState([getInitialMessage()]);
     const [sessionId, setSessionId] = useState(null);
     const [localSessionId, setLocalSessionId] = useState(() => Date.now().toString());
     const [isLoading, setIsLoading] = useState(false);
-    
     const [chatSessions, setChatSessions] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // Load history on mount
     useEffect(() => {
         const stored = localStorage.getItem('chat_sessions');
-        if (stored) {
-            try {
-                setChatSessions(JSON.parse(stored));
-            } catch (e) {
-                console.error('Failed to parse chat sessions', e);
-            }
+        if (!stored) {
+            return;
+        }
+
+        try {
+            setChatSessions(JSON.parse(stored));
+        } catch (error) {
+            console.error('Failed to parse chat sessions', error);
         }
     }, []);
 
-    // Save session when messages update
     useEffect(() => {
-        if (messages.length <= 1) return; // don't save just the welcome message
-        
-        setChatSessions(prev => {
-            const existingIdx = prev.findIndex(s => s.id === localSessionId);
-            const userMessages = messages.filter(m => m.sender === 'user');
+        if (messages.length <= 1) {
+            return;
+        }
+
+        setChatSessions((previousSessions) => {
+            const existingIndex = previousSessions.findIndex((session) => session.id === localSessionId);
+            const userMessages = messages.filter((message) => message.sender === 'user');
             const title = userMessages.length > 0 ? userMessages[0].text : '새로운 대화';
-            
-            const newSession = {
+
+            const nextSession = {
                 id: localSessionId,
                 backendSessionId: sessionId,
                 title,
@@ -144,26 +251,29 @@ const AIChatPage = () => {
                 messages
             };
 
-            let updated;
-            if (existingIdx >= 0) {
-                updated = [...prev];
-                updated[existingIdx] = newSession;
+            let updatedSessions;
+            if (existingIndex >= 0) {
+                updatedSessions = [...previousSessions];
+                updatedSessions[existingIndex] = nextSession;
             } else {
-                updated = [newSession, ...prev];
+                updatedSessions = [nextSession, ...previousSessions];
             }
-            
-            localStorage.setItem('chat_sessions', JSON.stringify(updated));
-            return updated;
+
+            localStorage.setItem('chat_sessions', JSON.stringify(updatedSessions));
+            return updatedSessions;
         });
-    }, [messages, sessionId, localSessionId]);
+    }, [localSessionId, messages, sessionId]);
 
     const handleReset = () => {
-        if (window.confirm('새로운 대화를 시작하시겠습니까? (이전 대화는 히스토리로 보존됩니다)')) {
-            setMessages([getInitialMessage()]);
-            setSessionId(null);
-            setLocalSessionId(Date.now().toString());
-            setIsSidebarOpen(false);
+        const shouldReset = window.confirm('새로운 대화를 시작할까요? 이전 대화는 히스토리에 저장됩니다.');
+        if (!shouldReset) {
+            return;
         }
+
+        setMessages([getInitialMessage()]);
+        setSessionId(null);
+        setLocalSessionId(Date.now().toString());
+        setIsSidebarOpen(false);
     };
 
     const handleSelectSession = (session) => {
@@ -174,98 +284,112 @@ const AIChatPage = () => {
     };
 
     const handleSend = async (text) => {
-        if (!text.trim() || isLoading) return;
+        if (!text.trim() || isLoading) {
+            return;
+        }
 
-        const userMsgId = Date.now().toString();
-        setMessages(prev => [...prev, { 
-            id: userMsgId, 
-            sender: 'user', 
-            text,
-            timestamp: new Date().toISOString()
-        }]);
-        
-        const tempBotMsgId = (Date.now() + 1).toString();
-        setMessages(prev => [...prev, { id: tempBotMsgId, sender: 'bot', isTyping: true }]);
+        const userMessageId = Date.now().toString();
+        setMessages((previous) => [
+            ...previous,
+            {
+                id: userMessageId,
+                sender: 'user',
+                text,
+                timestamp: new Date().toISOString()
+            }
+        ]);
+
+        const typingMessageId = (Date.now() + 1).toString();
+        setMessages((previous) => [...previous, { id: typingMessageId, sender: 'bot', isTyping: true }]);
         setIsLoading(true);
 
         try {
-            // Use mock API for demonstration instead of real askChatbot
-            // const res = await askChatbot({ message: text, sessionId });
-            const res = await mockAskChatbot(text, sessionId);
+            const response = await mockAskChatbot(text, sessionId);
+            setMessages((previous) => previous.filter((message) => message.id !== typingMessageId));
 
-            setMessages(prev => prev.filter(m => m.id !== tempBotMsgId));
+            if (response?.resultCode !== 'S-1' || !response.data) {
+                throw new Error(response?.message || 'Invalid response');
+            }
 
-            if (res && res.resultCode === 'S-1' && res.data) {
-                const { answer, policies, references, matchedPolicyCount, responseType, suggestedReplies } = res.data;
-                const newSessionId = res.data.sessionId;
+            const {
+                answer,
+                matchedPolicyCount,
+                policies,
+                references,
+                responseType,
+                suggestedReplies
+            } = response.data;
 
-                if (newSessionId) {
-                    setSessionId(newSessionId);
-                }
+            if (response.data.sessionId) {
+                setSessionId(response.data.sessionId);
+            }
 
-                const botMsgId = (Date.now() + 2).toString();
-                
-                setMessages(prev => [...prev, {
-                    id: botMsgId,
+            const botMessageId = (Date.now() + 2).toString();
+            setMessages((previous) => [
+                ...previous,
+                {
+                    id: botMessageId,
                     sender: 'bot',
-                    answer: answer,
-                    responseType: responseType || 'POLICY_SEARCH',
+                    answer,
+                    responseType: responseType || RESPONSE_TYPES.POLICY_SEARCH,
                     suggestedReplies: suggestedReplies || [],
                     policies: policies || [],
                     references: references || [],
-                    matchedPolicyCount: matchedPolicyCount !== undefined ? matchedPolicyCount : 0,
+                    matchedPolicyCount: matchedPolicyCount ?? 0,
                     timestamp: new Date().toISOString()
-                }]);
-            } else {
-                throw new Error(res?.message || 'Invalid Response');
-            }
+                }
+            ]);
         } catch (error) {
-            console.error('Chat API Error:', error);
-            setMessages(prev => prev.filter(m => m.id !== tempBotMsgId));
-            
-            const errorMsgId = (Date.now() + 2).toString();
-            setMessages(prev => [...prev, {
-                id: errorMsgId,
-                sender: 'system',
-                text: '서버와 연결하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-                timestamp: new Date().toISOString()
-            }]);
+            console.error('Chat API error:', error);
+            setMessages((previous) => previous.filter((message) => message.id !== typingMessageId));
+
+            const errorMessageId = (Date.now() + 2).toString();
+            setMessages((previous) => [
+                ...previous,
+                {
+                    id: errorMessageId,
+                    sender: 'system',
+                    text: '서버와 연결하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+                    timestamp: new Date().toISOString()
+                }
+            ]);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-140px)] bg-gray-50 pt-20 pb-4 px-4 md:px-0 relative overflow-hidden">
-            <div className="max-w-3xl w-full mx-auto flex flex-col flex-1 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden relative">
-                {/* Header - Reverted to Blue Theme */}
-                <div className="bg-blue-600 text-white p-4 text-center shrink-0 shadow-md z-10 relative flex items-center justify-between">
+        <div className="relative flex min-h-[calc(100vh-140px)] flex-col overflow-hidden bg-gray-50 px-4 pb-4 pt-20 md:px-0">
+            <div className="relative mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
+                <div className="relative z-10 flex shrink-0 items-center justify-between bg-blue-600 p-4 text-center text-white shadow-md">
                     <div className="w-16">
                         {sessionId && (
-                            <span className="text-[10px] bg-blue-700 px-2 py-1 rounded-full opacity-80 whitespace-nowrap">
+                            <span className="whitespace-nowrap rounded-full bg-blue-700 px-2 py-1 text-[10px] opacity-80">
                                 이전 질문 기준 추천
                             </span>
                         )}
                     </div>
+
                     <div className="flex flex-col items-center">
-                        <h2 className="text-lg font-bold flex items-center justify-center">
-                            <Bot className="mr-2" /> 복지 정책 안내 챗봇
+                        <h2 className="flex items-center justify-center text-lg font-bold">
+                            <Bot className="mr-2" />
+                            복지 정책 안내 챗봇
                         </h2>
-                        <p className="text-xs text-blue-100 mt-1">상황에 맞는 복지 정책을 찾아드려요</p>
+                        <p className="mt-1 text-xs text-blue-100">상황에 맞는 복지 정책을 찾아드려요.</p>
                     </div>
-                    {/* Buttons */}
-                    <div className="w-16 flex justify-end gap-1">
-                        <button 
+
+                    <div className="flex w-16 justify-end gap-1">
+                        <button
                             onClick={handleReset}
-                            className="p-2 hover:bg-blue-700 rounded transition-colors text-white"
+                            className="rounded p-2 text-white transition-colors hover:bg-blue-700"
                             title="새 대화 시작"
                             aria-label="새 대화 시작"
                         >
                             <RotateCcw size={18} />
                         </button>
-                        <button 
+                        <button
                             onClick={() => setIsSidebarOpen(true)}
-                            className="p-2 hover:bg-blue-700 rounded transition-colors text-white"
+                            className="rounded p-2 text-white transition-colors hover:bg-blue-700"
                             title="대화 히스토리"
                             aria-label="대화 히스토리"
                         >
@@ -274,17 +398,13 @@ const AIChatPage = () => {
                     </div>
                 </div>
 
-                {/* Chat Message List */}
                 <ChatMessageList messages={messages} onChipClick={handleSend} />
-
-                {/* Chat Input */}
                 <ChatInput onSend={handleSend} disabled={isLoading} />
             </div>
 
-            {/* Sidebar Overlay - Moved to avoid blocking pointer events */}
-            <ChatHistorySidebar 
-                isOpen={isSidebarOpen} 
-                onClose={() => setIsSidebarOpen(false)} 
+            <ChatHistorySidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
                 sessions={chatSessions}
                 onSelectSession={handleSelectSession}
             />
