@@ -25,6 +25,15 @@ public class UserService {
         return UserSummary.from(user);
     }
 
+    // 🚀 [추가됨] 이메일로 내 정보를 찾는 기능!
+    @Transactional(readOnly = true)
+    public UserSummary getCurrentUserByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(404, "User not found with email: " + email));
+
+        return UserSummary.from(user);
+    }
+
     public HealthCheckDto getStatus() {
         return new HealthCheckDto("user", "user module ready");
     }
