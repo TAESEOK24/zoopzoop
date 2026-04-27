@@ -1,6 +1,10 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -9,12 +13,13 @@ import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAskResponse;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotResponseType;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySearchService;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,11 +35,21 @@ class ChatbotServiceTest {
     @Mock
     private ChatbotConversationMemory conversationMemory;
 
-    @InjectMocks
     private ChatbotService chatbotService;
 
+    @BeforeEach
+    void setUp() {
+        chatbotService = new ChatbotService(
+                policySearchService,
+                chatbotAiClient,
+                conversationMemory,
+                new ChatbotIntentClassifier(),
+                new ChatbotIntakeMemory()
+        );
+    }
+
     @Test
-    void askReturnsSessionAwareResponse() {
+    void askReturnsPolicyResponseForDirectPolicyQuestion() {
         List<PolicySearchResultDto> policies = List.of(
                 new PolicySearchResultDto(
                         "svc-1",
@@ -53,39 +68,101 @@ class ChatbotServiceTest {
         when(conversationMemory.resolveSessionId(null)).thenReturn("session-1");
         when(conversationMemory.getRecentMessages("session-1"))
                 .thenReturn(List.of(new ChatbotConversationMessage("assistant", "안녕하세요")));
-        when(policySearchService.searchPolicies("housing help", 3)).thenReturn(policies);
+        when(policySearchService.searchPolicies("청년 주거 지원 알려줘", 3)).thenReturn(policies);
         when(chatbotAiClient.generateAnswer(
-                "housing help",
+                "청년 주거 지원 알려줘",
                 List.of(new ChatbotConversationMessage("assistant", "안녕하세요")),
                 policies
         )).thenReturn(new ChatbotAiResult(
-                "청년 주거 지원 정책을 우선 확인해 보세요.",
-                List.of(new ChatbotRecommendationDto("svc-1", "주거비 부담 완화와 직접 관련된 정책입니다."))
+                "청년 주거 지원 정책을 찾았어요.",
+                List.of(new ChatbotRecommendationDto("svc-1", "주거비 부담을 줄이는 데 도움이 됩니다."))
         ));
 
-        ChatbotAskResponse response = chatbotService.ask(null, "housing help");
+        ChatbotAskResponse response = chatbotService.ask(null, "청년 주거 지원 알려줘");
 
         assertEquals("session-1", response.sessionId());
-        assertEquals("청년 주거 지원 정책을 우선 확인해 보세요.", response.answer());
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals("청년 주거 지원 정책을 찾았어요.", response.answer());
         assertEquals(1, response.matchedPolicyCount());
         assertEquals(1, response.policies().size());
-        verify(conversationMemory).appendUserMessage("session-1", "housing help");
-        verify(conversationMemory).appendAssistantMessage("session-1", "청년 주거 지원 정책을 우선 확인해 보세요.");
+        assertEquals(3, response.suggestedReplies().size());
+        verify(conversationMemory).appendUserMessage("session-1", "청년 주거 지원 알려줘");
+        verify(conversationMemory).appendAssistantMessage("session-1", "청년 주거 지원 정책을 찾았어요.");
     }
 
     @Test
-    void askStillCallsAiWhenNoPoliciesFound() {
+    void askStartsClarificationFlowForAmbiguousHardshipMessage() {
         when(conversationMemory.resolveSessionId("session-2")).thenReturn("session-2");
         when(conversationMemory.getRecentMessages("session-2")).thenReturn(List.of());
-        when(policySearchService.searchPolicies("안녕", 3)).thenReturn(List.of());
-        when(chatbotAiClient.generateAnswer("안녕", List.of(), List.of()))
-                .thenReturn(new ChatbotAiResult("안녕하세요. 어떤 정책이 궁금하신가요?", List.of()));
 
-        ChatbotAskResponse response = chatbotService.ask("session-2", "안녕");
+        ChatbotAskResponse response = chatbotService.ask("session-2", "나는 너무 가난한 것 같아");
 
-        assertEquals("session-2", response.sessionId());
-        assertEquals("안녕하세요. 어떤 정책이 궁금하신가요?", response.answer());
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("연령대"));
         assertEquals(0, response.matchedPolicyCount());
-        assertEquals(0, response.policies().size());
+        assertEquals(2, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void askContinuesClarificationAndThenSearchesAfterEnoughContext() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-1",
+                        "Youth One-Person Housing Support",
+                        "Supports one-person young households.",
+                        "Young single-person households",
+                        "Monthly rent support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-1",
+                        "Seoul",
+                        "Youth Policy Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-3")).thenReturn("session-3");
+        when(conversationMemory.getRecentMessages("session-3")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("나는 너무 가난한 것 같아", List.of(), policies))
+                .thenReturn(new ChatbotAiResult(
+                        "청년 1인 가구에 맞는 지원 정책을 찾았어요.",
+                        List.of(new ChatbotRecommendationDto("svc-1", "청년 1인 가구의 주거 부담과 연결됩니다."))
+                ));
+
+        ChatbotAskResponse firstResponse = chatbotService.ask("session-3", "나는 너무 가난한 것 같아");
+        ChatbotAskResponse secondResponse = chatbotService.ask("session-3", "청년");
+        ChatbotAskResponse thirdResponse = chatbotService.ask("session-3", "혼자 살아요");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, firstResponse.responseType());
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, secondResponse.responseType());
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, thirdResponse.responseType());
+        assertEquals(1, thirdResponse.matchedPolicyCount());
+        verify(policySearchService).searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3);
+    }
+
+    @Test
+    void askReturnsSmalltalkResponseWithoutPolicySearch() {
+        when(conversationMemory.resolveSessionId("session-4")).thenReturn("session-4");
+        when(conversationMemory.getRecentMessages("session-4")).thenReturn(List.of());
+
+        ChatbotAskResponse response = chatbotService.ask("session-4", "안녕");
+
+        assertEquals(ChatbotResponseType.SMALLTALK, response.responseType());
+        assertEquals(0, response.matchedPolicyCount());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+    }
+
+    @Test
+    void askReturnsSafetyResponseForRiskMessage() {
+        when(conversationMemory.resolveSessionId("session-5")).thenReturn("session-5");
+        when(conversationMemory.getRecentMessages("session-5")).thenReturn(List.of());
+
+        ChatbotAskResponse response = chatbotService.ask("session-5", "죽고 싶어");
+
+        assertEquals(ChatbotResponseType.SAFETY, response.responseType());
+        assertTrue(response.answer().contains("109"));
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
     }
 }
