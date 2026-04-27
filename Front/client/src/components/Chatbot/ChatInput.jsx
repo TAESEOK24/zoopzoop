@@ -9,9 +9,9 @@ const ChatInput = ({ onSend, disabled }) => {
     const textareaRef = useRef(null);
 
     const SUGGESTIONS = [
-        "청년 주거 지원 정책 알려줘",
-        "대학생 장학금 관련 정보 찾아줘",
-        "취업 준비생을 위한 지원금 있어?"
+        "청년 주거 지원 알려줘",
+        "생활이 너무 힘들어",
+        "월세 내기 힘들어"
     ];
 
     const handleSubmit = (e) => {
@@ -73,7 +73,7 @@ const ChatInput = ({ onSend, disabled }) => {
                     onChange={handleInput}
                     onKeyDown={handleKeyDown}
                     disabled={disabled}
-                    placeholder="메시지를 입력하세요... (Shift+Enter로 줄바꿈)"
+                    placeholder="질문이나 현재 상황을 편하게 입력해주세요..."
                     className="flex-1 max-h-[120px] min-h-[44px] resize-none border border-gray-300 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow bg-white disabled:bg-gray-100"
                     rows={1}
                 />

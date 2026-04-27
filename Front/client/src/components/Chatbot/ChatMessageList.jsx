@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Bot, ExternalLink, Volume2, Copy } from 'lucide-react';
 import PolicyCardList from './PolicyCardList';
-
-/**
+import SuggestedReplyChips from './SuggestedReplyChips';
+import SafetyNotice from './SafetyNotice';/**
  * @typedef {Object} Message
  * @property {string} id
  * @property {'user'|'bot'|'system'} sender
@@ -12,13 +12,15 @@ import PolicyCardList from './PolicyCardList';
  * @property {Array} [references]
  * @property {boolean} [isTyping]
  * @property {number} [matchedPolicyCount]
+ * @property {string} [responseType]
+ * @property {Array} [suggestedReplies]
  * @property {string} [timestamp]
  */
 
 /**
- * @param {{ messages: Message[] }} props 
+ * @param {{ messages: Message[], onChipClick: (value: string) => void }} props 
  */
-const ChatMessageList = ({ messages }) => {
+const ChatMessageList = ({ messages, onChipClick }) => {
     const endRef = useRef(null);
 
     useEffect(() => {
@@ -58,9 +60,10 @@ const ChatMessageList = ({ messages }) => {
 
     return (
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 space-y-6">
-            {messages.map((msg) => {
+            {messages.map((msg, index) => {
                 const isBot = msg.sender === 'bot';
                 const isSystem = msg.sender === 'system';
+                const isLastMessage = index === messages.length - 1;
 
                 if (isSystem) {
                     return (
@@ -105,17 +108,24 @@ const ChatMessageList = ({ messages }) => {
                                     <div className="space-y-4">
                                         {/* 1. Answer */}
                                         {msg.answer && (
-                                            <div className="whitespace-pre-wrap">{msg.answer}</div>
+                                            <div className="whitespace-pre-wrap leading-relaxed">{msg.answer}</div>
                                         )}
 
-                                        {/* 2. Policies */}
-                                        {msg.matchedPolicyCount !== undefined && <div className="mt-2 text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded inline-block">찾은 정책: {msg.matchedPolicyCount}건</div>}
-                                        {msg.policies && msg.policies.length > 0 && (
-                                            <PolicyCardList policies={msg.policies} />
+                                        {/* 2. Safety Notice */}
+                                        {msg.responseType === 'SAFETY' && (
+                                            <SafetyNotice />
                                         )}
 
-                                        {/* 3. References */}
-                                        {msg.references && msg.references.length > 0 && (
+                                        {/* 3. Policies */}
+                                        {msg.responseType === 'POLICY_SEARCH' && msg.policies && msg.policies.length > 0 && (
+                                            <>
+                                                {msg.matchedPolicyCount !== undefined && <div className="mt-2 text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded inline-block">찾은 정책: {msg.matchedPolicyCount}건</div>}
+                                                <PolicyCardList policies={msg.policies} />
+                                            </>
+                                        )}
+
+                                        {/* 4. References */}
+                                        {msg.responseType === 'POLICY_SEARCH' && msg.references && msg.references.length > 0 && (
                                             <div className="pt-2 border-t border-gray-100">
                                                 <p className="text-xs font-semibold text-gray-700 mb-2">🔗 관련 링크</p>
                                                 <ul className="space-y-1">
@@ -137,6 +147,15 @@ const ChatMessageList = ({ messages }) => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Suggested Reply Chips - Only show on last message if exists */}
+                            {!msg.isTyping && isBot && isLastMessage && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+                                <SuggestedReplyChips 
+                                    chips={msg.suggestedReplies} 
+                                    onChipClick={onChipClick} 
+                                    size={msg.responseType === 'CLARIFICATION_NEEDED' ? 'large' : 'default'}
+                                />
+                            )}
 
                             {/* Timestamp Component / Button Actions Area */}
                             {msg.timestamp && !msg.isTyping && (
