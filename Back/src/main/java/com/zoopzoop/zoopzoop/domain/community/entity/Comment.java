@@ -21,4 +21,9 @@ public class Comment {
     private String content;
 
     private String date;
+
+    // 🚀 [추가됨] 댓글 내용을 수정할 때 사용할 스위치(메서드)
+    public void updateContent(String content) {
+        this.content = content;
+    }
 }

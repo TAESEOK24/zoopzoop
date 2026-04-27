@@ -15,6 +15,14 @@ const CommunityWrite = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // 🚀 [핵심 추가 1] 로그인(토큰) 여부 검사 방어막!
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            alert('로그인 후 글을 작성할 수 있습니다.');
+            navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로 쫓아냄
+            return; // 여기서 함수를 끝내버려서 500 에러 방지
+        }
+
         // 빈 칸 검사
         if (!title.trim() || !content.trim()) {
             alert('제목과 내용을 모두 입력해주세요.');
@@ -24,13 +32,16 @@ const CommunityWrite = () => {
         try {
             setLoading(true);
 
+            // 🚀 [핵심 추가 2] '테스트유저' 대신 진짜 로그인한 내 명찰(이름) 가져오기
+            const currentUserName = localStorage.getItem('userName') || '익명';
+
             // 백엔드로 보낼 데이터 객체 조립
             const postData = {
                 type: '일반',          // 기본 타입
                 category: category,    // 선택한 카테고리
                 title: title,
                 content: content,
-                author: '테스트유저'   // 임시 작성자 (추후 로그인 연동 시 변경)
+                author: currentUserName // 🚀 진짜 이름으로 교체!
             };
 
             // API 함수 호출하여 DB에 저장

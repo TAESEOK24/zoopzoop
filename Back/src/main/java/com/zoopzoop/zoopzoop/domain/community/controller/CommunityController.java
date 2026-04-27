@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map; // 🚀 이 줄이 없어서 에리나 난 것입니다!
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/community")
@@ -52,17 +52,27 @@ public class CommunityController {
 
     // ================= 댓글 API ================= //
 
+    // 댓글 목록 조회
     @GetMapping("/posts/{postId}/comments")
     public ApiResponse<List<CommentDto.Response>> getComments(@PathVariable Long postId) {
         return ApiResponse.ok(communityService.getComments(postId));
     }
 
+    // 댓글 작성
     @PostMapping("/posts/{postId}/comments")
     public ApiResponse<String> addComment(@PathVariable Long postId, @RequestBody CommentDto.Request request) {
         communityService.addComment(postId, request);
         return ApiResponse.ok("댓글 등록 완료");
     }
 
+    // 🚀 [추가됨] 댓글 수정
+    @PutMapping("/comments/{commentId}")
+    public ApiResponse<String> updateComment(@PathVariable Long commentId, @RequestBody CommentDto.Request request) {
+        communityService.updateComment(commentId, request);
+        return ApiResponse.ok("댓글 수정 완료");
+    }
+
+    // 댓글 삭제
     @DeleteMapping("/comments/{commentId}")
     public ApiResponse<String> deleteComment(@PathVariable Long commentId) {
         communityService.deleteComment(commentId);

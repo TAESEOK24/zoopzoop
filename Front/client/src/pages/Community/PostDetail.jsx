@@ -5,7 +5,8 @@ import {
     deleteCommunityPost,
     fetchComments,
     createComment,
-    deleteComment
+    deleteComment,
+    updateComment // 🚀 댓글 수정 API 추가됨
 } from '../../api/community';
 
 const PostDetail = () => {
@@ -14,10 +15,16 @@ const PostDetail = () => {
 
     const [post, setPost] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // 댓글 관련 상태 관리
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
 
-    // 🚀 [핵심 추가 1] 로컬 스토리지에서 내 이름(명찰) 꺼내기
+    // 🚀 댓글 수정 모드 관련 상태 관리
+    const [editingCommentId, setEditingCommentId] = useState(null); // 수정 중인 댓글의 ID
+    const [editCommentContent, setEditCommentContent] = useState(''); // 수정 중인 텍스트 내용
+
+    // 로컬 스토리지에서 내 이름(명찰) 꺼내기
     const currentUserName = localStorage.getItem('userName');
 
     useEffect(() => {
@@ -38,6 +45,7 @@ const PostDetail = () => {
         loadData();
     }, [id, navigate]);
 
+    // 게시글 삭제
     const handleDeletePost = async () => {
         if (window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
             try {
@@ -50,7 +58,7 @@ const PostDetail = () => {
         }
     };
 
-    // 🚀 [핵심 추가 2] 댓글 등록 시 로그인 여부 검사
+    // 새 댓글 등록
     const handleAddComment = async (e) => {
         e.preventDefault();
 
@@ -65,7 +73,9 @@ const PostDetail = () => {
 
         try {
             await createComment(id, { content: newComment });
-            setNewComment('');
+            setNewComment(''); // 입력창 비우기
+
+            // 등록 후 댓글 목록 새로고침
             const commentResponse = await fetchComments(id);
             setComments(commentResponse.data.data);
         } catch (error) {
@@ -73,15 +83,47 @@ const PostDetail = () => {
         }
     };
 
+    // 댓글 삭제
     const handleDeleteComment = async (commentId) => {
         if (window.confirm("댓글을 삭제하시겠습니까?")) {
             try {
                 await deleteComment(commentId);
+                // 삭제 후 댓글 목록 새로고침
                 const commentResponse = await fetchComments(id);
                 setComments(commentResponse.data.data);
             } catch (error) {
                 alert("댓글 삭제에 실패했습니다.");
             }
+        }
+    };
+
+    // 🚀 수정 버튼을 눌렀을 때 작동
+    const handleEditClick = (comment) => {
+        setEditingCommentId(comment.id); // 현재 댓글을 '수정 모드'로 변경
+        setEditCommentContent(comment.content); // 기존 내용을 입력창에 세팅
+    };
+
+    // 🚀 수정 취소
+    const handleCancelEdit = () => {
+        setEditingCommentId(null); // 수정 모드 해제
+        setEditCommentContent('');
+    };
+
+    // 🚀 수정 완료(저장) 백엔드 전송
+    const handleUpdateComment = async (commentId) => {
+        if (!editCommentContent.trim()) return alert("수정할 내용을 입력해주세요.");
+
+        try {
+            await updateComment(commentId, { content: editCommentContent });
+            alert("댓글이 수정되었습니다.");
+
+            setEditingCommentId(null); // 수정 모드 해제
+
+            // 수정 후 댓글 목록 새로고침
+            const commentResponse = await fetchComments(id);
+            setComments(commentResponse.data.data);
+        } catch (error) {
+            alert("댓글 수정에 실패했습니다.");
         }
     };
 
@@ -98,7 +140,7 @@ const PostDetail = () => {
                         ← 목록으로 돌아가기
                     </button>
 
-                    {/* 🚀 [핵심 추가 3] 내 글일 때만 게시글 수정/삭제 버튼 노출 */}
+                    {/* 내 게시글일 때만 수정/삭제 버튼 노출 */}
                     {currentUserName === post.author && (
                         <div className="space-x-3">
                             <button onClick={() => navigate(`/community/edit/${id}`)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-bold text-sm">
@@ -135,6 +177,7 @@ const PostDetail = () => {
                         댓글 <span className="text-blue-600">{comments.length}</span>
                     </h3>
 
+                    {/* 새 댓글 작성 폼 */}
                     <form onSubmit={handleAddComment} className="mb-8">
                         <div className="flex gap-4">
                             <textarea
@@ -150,6 +193,7 @@ const PostDetail = () => {
                         </div>
                     </form>
 
+                    {/* 댓글 목록 */}
                     <div className="space-y-6">
                         {comments.length === 0 ? (
                             <div className="text-center text-gray-500 py-4">아직 작성된 댓글이 없습니다.</div>
@@ -162,17 +206,46 @@ const PostDetail = () => {
                                             <span className="text-sm text-gray-400">{comment.date}</span>
                                         </div>
 
-                                        {/* 🚀 [핵심 추가 4] 내 댓글일 때만 삭제 버튼 노출 */}
+                                        {/* 내 댓글일 때만 노출되는 버튼들 */}
                                         {currentUserName === comment.author && (
-                                            <button
-                                                onClick={() => handleDeleteComment(comment.id)}
-                                                className="text-sm text-red-400 hover:text-red-600 font-medium"
-                                            >
-                                                삭제
-                                            </button>
+                                            <div className="space-x-3">
+                                                <button
+                                                    onClick={() => handleEditClick(comment)}
+                                                    className="text-sm text-gray-400 hover:text-blue-600 font-medium"
+                                                >
+                                                    수정
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteComment(comment.id)}
+                                                    className="text-sm text-red-400 hover:text-red-600 font-medium"
+                                                >
+                                                    삭제
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
-                                    <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+
+                                    {/* 🚀 현재 이 댓글이 '수정 모드'인지 확인해서 화면을 다르게 보여줌 */}
+                                    {editingCommentId === comment.id ? (
+                                        <div className="mt-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                            <textarea
+                                                value={editCommentContent}
+                                                onChange={(e) => setEditCommentContent(e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                                                rows="3"
+                                            ></textarea>
+                                            <div className="flex justify-end space-x-2 mt-3">
+                                                <button onClick={handleCancelEdit} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-bold transition shadow-sm">
+                                                    취소
+                                                </button>
+                                                <button onClick={() => handleUpdateComment(comment.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-bold transition shadow-sm">
+                                                    수정 완료
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                                    )}
                                 </div>
                             ))
                         )}
