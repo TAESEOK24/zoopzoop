@@ -32,22 +32,22 @@ const mockAskChatbot = async (text, sessionId) => {
                 matchedPolicyCount: 0
             };
 
-            if (text.includes('죽고') || text.includes('자살') || text.includes('포기')) {
+            if (text.includes('죽고') || text.includes('자살') || text.includes('포기') || text.includes('아파') || text.includes('응급')) {
                 data.responseType = 'SAFETY';
                 data.answer = '';
                 data.suggestedReplies = [
                     { label: '긴급복지 문의', value: '긴급복지 문의' },
                     { label: '생계 지원 문의', value: '생계 지원 문의' }
                 ];
-            } else if (text.includes('주식') || text.includes('투자') || text.includes('코인')) {
+            } else if (text.includes('주식') || text.includes('투자') || text.includes('코인') || text.includes('똥마려워') || text.includes('날씨')) {
                 data.responseType = 'OFF_TOPIC';
-                data.answer = '저는 복지 정책 및 공공 서비스 안내를 도와드리는 도우미입니다. 원하시는 지원 분야를 선택하시거나 말씀해주세요.';
+                data.answer = '저는 복지 정책 안내 챗봇이에요. 청년, 주거, 취업, 생계 지원 같은 질문을 주시면 도와드릴 수 있어요.';
                 data.suggestedReplies = [
                     { label: '청년 지원', value: '청년 지원 알려줘' },
                     { label: '주거 지원', value: '주거 지원 알려줘' },
                     { label: '취업 지원', value: '취업 지원 알려줘' }
                 ];
-            } else if (text.includes('가난') || text.includes('힘들어') || text.includes('월세')) {
+            } else if (text.includes('가난') || text.includes('힘들어') || text.includes('월세') || text.includes('막막해')) {
                 data.responseType = 'CLARIFICATION_NEEDED';
                 data.answer = '생활이 많이 부담되실 수 있겠어요.\n맞는 지원 정책을 찾으려면 현재 연령대를 알려주세요.';
                 data.suggestedReplies = [
@@ -55,7 +55,7 @@ const mockAskChatbot = async (text, sessionId) => {
                     { label: '중장년', value: '중장년' },
                     { label: '노년', value: '노년' }
                 ];
-            } else if (text.includes('청년') || text.includes('주거')) {
+            } else if (text.includes('청년') || text.includes('주거') || text.includes('조건 더 보기')) {
                 data.responseType = 'POLICY_SEARCH';
                 data.answer = '청년 주거비 부담을 덜 수 있는 정책들을 찾았어요.\n신청 조건과 지원 내용을 함께 확인해보세요.';
                 data.matchedPolicyCount = 3;
