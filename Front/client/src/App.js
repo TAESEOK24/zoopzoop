@@ -1,48 +1,41 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import Footer from './components/layout/Footer';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/layout/Header';
-import AIChatPage from './pages/AIChat/index';
-// 1️⃣ 커뮤니티 페이지 import 추가
-import CommunityPage from './pages/Community/index';
-import LoginPage from './pages/Login/index';
-import MainPage from './pages/Main/index';
-import PolicyDetailPage from './pages/Policy/Detail';
-import PolicyPage from './pages/Policy/index';
-import SignupPage from './pages/Signup/index';
-import ChatbotWidget from './components/Chatbot/ChatbotWidget';
-import CommunityWrite from './pages/Community/Write';
+import Footer from './components/layout/Footer';
+import MainPage from './pages/Main';
+import LoginPage from './pages/Login';
+import SignupPage from './pages/Signup';
+import CommunityPage from './pages/Community';
 import PostDetail from './pages/Community/PostDetail';
+import CommunityWrite from './pages/Community/Write';
 import CommunityEdit from './pages/Community/CommunityEdit';
-
-const EmptyPage = ({ title }) => (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <h1 className="text-3xl font-bold text-gray-500">{title} 페이지는 준비 중입니다.</h1>
-    </div>
-);
+import AIChatPage from './pages/AIChat';
+import PolicyPage from './pages/Policy';
+import PolicyDetail from './pages/Policy/Detail';
+import MyPage from './pages/MyPage'; // 🚀 마이페이지 임포트
 
 function App() {
     return (
         <Router>
-            <Header />
-            <Routes>
-                <Route path="/" element={<MainPage />} />
-                <Route path="/ai-chat" element={<AIChatPage />} />
-
-                {/* 2️⃣ EmptyPage를 CommunityPage로 변경 */}
-                <Route path="/community" element={<CommunityPage />} />
-
-                <Route path="/policies" element={<PolicyPage />} />
-                <Route path="/policies/:serviceId" element={<PolicyDetailPage />} />
-                <Route path="/qna" element={<EmptyPage title="질의응답" />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/signup" element={<SignupPage />} />
-                <Route path="/community/write" element={<CommunityWrite />} />
-                <Route path="/community/post/:id" element={<PostDetail />} />
-                <Route path="/community/edit/:id" element={<CommunityEdit />} />
-            </Routes>
-            <Footer />
-            <ChatbotWidget />
+            <div className="flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-grow">
+                    <Routes>
+                        <Route path="/" element={<MainPage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/signup" element={<SignupPage />} />
+                        <Route path="/community" element={<CommunityPage />} />
+                        <Route path="/community/post/:id" element={<PostDetail />} />
+                        <Route path="/community/write" element={<CommunityWrite />} />
+                        <Route path="/community/edit/:id" element={<CommunityEdit />} />
+                        <Route path="/ai-chat" element={<AIChatPage />} />
+                        <Route path="/policies" element={<PolicyPage />} />
+                        <Route path="/policy/:id" element={<PolicyDetail />} />
+                        <Route path="/mypage" element={<MyPage />} /> {/* 🚀 마이페이지 라우트 추가 */}
+                    </Routes>
+                </main>
+                <Footer />
+            </div>
         </Router>
     );
 }
