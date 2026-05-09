@@ -18,7 +18,7 @@ public class ChatbotIntentClassifier {
     );
 
     private static final List<String> POLICY_ASK_KEYWORDS = List.of(
-            "알려", "추천", "찾아", "뭐가 있", "있을까", "신청", "받을 수", "대상", "조건", "문의"
+            "알려", "추천", "찾아", "뭐가 있", "있을까", "궁금", "신청", "받을 수", "대상", "조건", "문의"
     );
 
     private static final List<String> HARDSHIP_KEYWORDS = List.of(

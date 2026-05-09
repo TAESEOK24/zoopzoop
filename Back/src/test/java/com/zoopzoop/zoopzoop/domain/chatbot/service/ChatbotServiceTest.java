@@ -91,6 +91,21 @@ class ChatbotServiceTest {
     }
 
     @Test
+    void askClarifiesBroadYouthPolicyQuestionWithoutPolicySearch() {
+        when(conversationMemory.resolveSessionId("session-youth")).thenReturn("session-youth");
+        when(conversationMemory.getRecentMessages("session-youth")).thenReturn(List.of());
+
+        ChatbotAskResponse response = chatbotService.ask("session-youth", "청년 정책 관련해서 궁금하게 있어");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
+        assertEquals(0, response.matchedPolicyCount());
+        assertEquals(4, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
     void askStartsClarificationFlowForAmbiguousHardshipMessage() {
         when(conversationMemory.resolveSessionId("session-2")).thenReturn("session-2");
         when(conversationMemory.getRecentMessages("session-2")).thenReturn(List.of());

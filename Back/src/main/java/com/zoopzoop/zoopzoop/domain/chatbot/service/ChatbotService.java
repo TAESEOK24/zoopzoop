@@ -49,7 +49,9 @@ public class ChatbotService {
         ChatbotResponseType responseType = aiResponseType == null ? fallbackResponseType : aiResponseType;
 
         ChatbotAskResponse response = switch (responseType) {
-            case POLICY_SEARCH -> buildPolicySearchResponse(resolvedSessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
+            case POLICY_SEARCH -> isBroadYouthPolicyQuestion(message)
+                    ? buildYouthPolicyClarificationResponse(resolvedSessionId)
+                    : buildPolicySearchResponse(resolvedSessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
             case CLARIFICATION_NEEDED -> buildClarificationResponse(resolvedSessionId, message, history);
             case SMALLTALK -> buildSimpleResponse(
                     resolvedSessionId,
@@ -185,6 +187,23 @@ public class ChatbotService {
         );
     }
 
+    private ChatbotAskResponse buildYouthPolicyClarificationResponse(String sessionId) {
+        return new ChatbotAskResponse(
+                sessionId,
+                "청년 정책은 범위가 넓어요. 주거, 취업, 생활비, 창업 중 어떤 분야가 궁금하세요?",
+                ChatbotResponseType.CLARIFICATION_NEEDED,
+                List.of(
+                        new ChatbotSuggestedReplyDto("주거 지원", "청년 주거 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("취업 지원", "청년 취업 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("생활비 지원", "청년 생활비 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("창업 지원", "청년 창업 지원 정책 알려줘")
+                ),
+                List.of(),
+                List.of(),
+                0
+        );
+    }
+
     private void mergeProfile(ChatbotIntakeMemory.ChatbotIntakeProfile profile, String rawMessage) {
         String message = rawMessage == null ? "" : rawMessage.trim().toLowerCase();
 
@@ -300,6 +319,23 @@ public class ChatbotService {
 
     private boolean looksLikeConcernMessage(String message) {
         return message != null && message.length() >= 8;
+    }
+
+    private boolean isBroadYouthPolicyQuestion(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return normalized.contains("청년")
+                && normalized.contains("정책")
+                && !containsAny(
+                        normalized,
+                        "주거", "월세", "전세", "자가", "보증금",
+                        "취업", "구직", "일자리", "실업",
+                        "생활비", "생계", "긴급", "지원금", "수당",
+                        "창업", "사업", "돌봄", "출산", "육아", "대출", "신청", "조건", "대상"
+                );
     }
 
     private boolean containsAny(String message, String... keywords) {
