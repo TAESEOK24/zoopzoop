@@ -39,7 +39,14 @@ public class ChatbotService {
         String resolvedSessionId = conversationMemory.resolveSessionId(sessionId);
         List<ChatbotConversationMessage> history = conversationMemory.getRecentMessages(resolvedSessionId);
         ChatbotIntakeMemory.ChatbotIntakeProfile profile = intakeMemory.getProfile(resolvedSessionId);
-        ChatbotResponseType responseType = intentClassifier.classify(message, profile.isAwaitingClarification());
+        ChatbotResponseType fallbackResponseType = intentClassifier.classify(message, profile.isAwaitingClarification());
+        ChatbotResponseType aiResponseType = chatbotAiClient.classifyIntent(
+                message,
+                history,
+                profile.isAwaitingClarification(),
+                fallbackResponseType
+        );
+        ChatbotResponseType responseType = aiResponseType == null ? fallbackResponseType : aiResponseType;
 
         ChatbotAskResponse response = switch (responseType) {
             case POLICY_SEARCH -> buildPolicySearchResponse(resolvedSessionId, history, message, ChatbotResponseType.POLICY_SEARCH);

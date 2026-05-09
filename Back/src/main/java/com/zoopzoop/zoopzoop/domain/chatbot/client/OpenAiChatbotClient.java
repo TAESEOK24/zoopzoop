@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotAiResult;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
+import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotResponseType;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -21,11 +24,53 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
             "대화를 이어가며 도와드릴게요. 궁금한 정책 대상이나 상황을 조금 더 말씀해 주세요.";
 
     private final ChatClient chatClient;
+    private final String classificationModel;
+    private final String answerModel;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public OpenAiChatbotClient(ObjectProvider<ChatModel> chatModelProvider) {
+    public OpenAiChatbotClient(
+            ObjectProvider<ChatModel> chatModelProvider,
+            @Value("${chatbot.ai.classification-model:gpt-5.4-nano}") String classificationModel,
+            @Value("${chatbot.ai.answer-model:gpt-4o-mini}") String answerModel
+    ) {
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel).build();
+        this.classificationModel = classificationModel;
+        this.answerModel = answerModel;
+    }
+
+    @Override
+    public ChatbotResponseType classifyIntent(
+            String userMessage,
+            List<ChatbotConversationMessage> history,
+            boolean awaitingClarification,
+            ChatbotResponseType fallbackType
+    ) {
+        if (chatClient == null) {
+            log.warn("ChatModel bean is not available. Using fallback chatbot classification.");
+            return fallbackType;
+        }
+
+        try {
+            String content = chatClient.prompt()
+                    .options(OpenAiChatOptions.builder()
+                            .model(classificationModel)
+                            .temperature(0.0)
+                            .build())
+                    .system(buildClassificationSystemPrompt())
+                    .user(buildClassificationUserPrompt(userMessage, history, awaitingClarification))
+                    .call()
+                    .content();
+
+            if (content == null || content.isBlank()) {
+                return fallbackType;
+            }
+
+            return parseClassification(content, fallbackType);
+        } catch (Exception exception) {
+            log.warn("Spring AI OpenAI classification request failed. Using fallback classification.", exception);
+            return fallbackType;
+        }
     }
 
     @Override
@@ -41,6 +86,9 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
 
         try {
             String content = chatClient.prompt()
+                    .options(OpenAiChatOptions.builder()
+                            .model(answerModel)
+                            .build())
                     .system(buildSystemPrompt())
                     .user(buildUserPrompt(userMessage, history, policies))
                     .call()
@@ -57,6 +105,49 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
             log.error("Spring AI OpenAI request failed", exception);
             throw new AppException(502, "AI response generation failed.");
         }
+    }
+
+    private String buildClassificationSystemPrompt() {
+        return """
+                You classify Korean chatbot user messages for a welfare-policy assistant.
+                Return JSON only with this schema:
+                {
+                  "responseType": "POLICY_SEARCH | CLARIFICATION_NEEDED | SMALLTALK | OFF_TOPIC | SAFETY"
+                }
+
+                Choose SAFETY for self-harm, suicide, violence, medical emergency, or urgent danger.
+                Choose CLARIFICATION_NEEDED for ambiguous hardship where more user profile information is needed.
+                Choose POLICY_SEARCH for welfare, housing, employment, youth, living-cost, benefit, or application questions.
+                Choose SMALLTALK for greetings, thanks, or casual conversation.
+                Choose OFF_TOPIC when unrelated to welfare-policy assistance.
+                If awaitingClarification is true and the user provides a short profile answer, choose CLARIFICATION_NEEDED.
+                Do not include markdown.
+                """;
+    }
+
+    private String buildClassificationUserPrompt(
+            String userMessage,
+            List<ChatbotConversationMessage> history,
+            boolean awaitingClarification
+    ) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("awaitingClarification=").append(awaitingClarification).append('\n');
+        builder.append("Recent conversation:\n");
+
+        if (history.isEmpty()) {
+            builder.append("- no previous messages\n");
+        } else {
+            history.forEach(message -> builder.append("- ")
+                    .append(message.role())
+                    .append(": ")
+                    .append(trimToLength(message.content(), 100))
+                    .append('\n'));
+        }
+
+        builder.append("\nCurrent user message:\n")
+                .append(userMessage)
+                .append("\n\nReturn compact JSON only.");
+        return builder.toString();
     }
 
     private String buildSystemPrompt() {
@@ -121,6 +212,19 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
         return builder.toString();
     }
 
+    private ChatbotResponseType parseClassification(String content, ChatbotResponseType fallbackType) {
+        try {
+            ClassificationResult result = objectMapper.readValue(content, ClassificationResult.class);
+            if (result.responseType() == null || result.responseType().isBlank()) {
+                return fallbackType;
+            }
+            return ChatbotResponseType.valueOf(result.responseType().trim());
+        } catch (Exception parseException) {
+            log.warn("Failed to parse AI classification as JSON, using fallback classification");
+            return fallbackType;
+        }
+    }
+
     private ChatbotAiResult parseAiResult(String content, List<PolicySearchResultDto> policies) {
         try {
             ChatbotAiResult result = objectMapper.readValue(content, ChatbotAiResult.class);
@@ -176,5 +280,8 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
             return "질문과 연관된 정책입니다.";
         }
         return reason.trim();
+    }
+
+    private record ClassificationResult(String responseType) {
     }
 }
