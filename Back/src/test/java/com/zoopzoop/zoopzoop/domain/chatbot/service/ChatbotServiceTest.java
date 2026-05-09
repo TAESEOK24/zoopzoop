@@ -91,6 +91,65 @@ class ChatbotServiceTest {
     }
 
     @Test
+    void askClarifiesBroadYouthPolicyQuestionWithoutPolicySearch() {
+        when(conversationMemory.resolveSessionId("session-youth")).thenReturn("session-youth");
+        when(conversationMemory.getRecentMessages("session-youth")).thenReturn(List.of());
+
+        ChatbotAskResponse response = chatbotService.ask("session-youth", "청년 정책 관련해서 궁금하게 있어");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
+        assertEquals(0, response.matchedPolicyCount());
+        assertEquals(4, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void askClarifiesBroadYouthPolicyQuestionBeforeAiClassification() {
+        when(conversationMemory.resolveSessionId("session-youth-ai")).thenReturn("session-youth-ai");
+        when(conversationMemory.getRecentMessages("session-youth-ai")).thenReturn(List.of());
+
+        ChatbotAskResponse response = chatbotService.ask("session-youth-ai", "청년 정책에 대해서 알려줘");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
+        assertEquals(4, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+        verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void askSearchesSpecificJobSupportQuestion() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-job",
+                        "Youth Job Support",
+                        "Supports job seekers.",
+                        "Job seekers",
+                        "Employment support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-job",
+                        "Seoul",
+                        "Job Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-job")).thenReturn("session-job");
+        when(conversationMemory.getRecentMessages("session-job")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("구직 중인데 받을 수 있는 지원 정책 있어?", 3)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("구직 중인데 받을 수 있는 지원 정책 있어?", List.of(), policies))
+                .thenReturn(new ChatbotAiResult("구직 지원 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-job", "구직 중인데 받을 수 있는 지원 정책 있어?");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+    }
+
+    @Test
     void askStartsClarificationFlowForAmbiguousHardshipMessage() {
         when(conversationMemory.resolveSessionId("session-2")).thenReturn("session-2");
         when(conversationMemory.getRecentMessages("session-2")).thenReturn(List.of());

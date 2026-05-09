@@ -1,0 +1,312 @@
+[
+  {
+    "name": "넓은 청년 정책 질문은 분야를 되묻는다",
+    "steps": [
+      {
+        "message": "청년 정책에 대해서 알려줘",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "answerContains": "어떤 분야가 궁금하세요",
+        "expectedSuggestedReplyLabels": ["주거 지원", "취업 지원", "생활비 지원", "창업 지원"],
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "청년 정책 궁금 표현도 분야를 되묻는다",
+    "steps": [
+      {
+        "message": "청년 정책 관련해서 궁금하게 있어",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "answerContains": "어떤 분야가 궁금하세요",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "청년 지원 정책은 분야를 되묻는다",
+    "steps": [
+      {
+        "message": "청년 지원 정책에 대해서 알려줘",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "answerContains": "어떤 분야가 궁금하세요",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "청년 혜택 질문은 분야를 되묻는다",
+    "steps": [
+      {
+        "message": "청년이 받을 수 있는 혜택 알려줘",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "복지 지원 관련 넓은 질문은 분야를 되묻는다",
+    "steps": [
+      {
+        "message": "복지 지원 관련 정책도 있어?",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "받을 수 있는 지원금 질문은 추가 정보를 묻는다",
+    "steps": [
+      {
+        "message": "나는 월세 개념보다 우리가 받을 수 있는 지원금이 궁금해",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "청년 주거 지원은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 주거 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH",
+        "minMatchedPolicyCount": 1
+      }
+    ]
+  },
+  {
+    "name": "청년 월세 지원은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 월세 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH",
+        "minMatchedPolicyCount": 1
+      }
+    ]
+  },
+  {
+    "name": "월세 키워드 기반 사업 추천은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "월세 개념 이란 키워드 보고 관련 사업 추천",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "청년 취업 지원은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 취업 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH",
+        "minMatchedPolicyCount": 1
+      }
+    ]
+  },
+  {
+    "name": "구직 지원 질문은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "구직 중인데 받을 수 있는 지원 정책 있어?",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "청년 창업 지원은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 창업 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "청년 생활비 지원은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 생활비 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "긴급복지 질문은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "긴급복지 지원 알려줘",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "신청 조건 단독 후속 질문은 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "신청 조건 더 자세히 알려줘",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "정책 추천 후 신청 조건 후속 질문도 정책 검색으로 간다",
+    "steps": [
+      {
+        "message": "청년 주거 지원 정책 알려줘",
+        "expectedType": "POLICY_SEARCH",
+        "minMatchedPolicyCount": 1
+      },
+      {
+        "message": "신청 조건 더 자세히 알려줘",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "생활고 메시지는 추가 정보를 묻는다",
+    "steps": [
+      {
+        "message": "생활비가 너무 부족해서 힘들어",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "answerContains": "연령대",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "가난하다는 표현은 추가 정보를 묻는다",
+    "steps": [
+      {
+        "message": "나는 너무 가난한 것 같아",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "answerContains": "연령대",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "월세 부담 표현은 추가 정보를 묻는다",
+    "steps": [
+      {
+        "message": "월세 내기가 너무 힘들어",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "생활고 후속 답변은 충분한 정보가 모이면 검색한다",
+    "steps": [
+      {
+        "message": "생활비가 너무 부족해서 힘들어",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      },
+      {
+        "message": "청년",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      },
+      {
+        "message": "혼자 살아요",
+        "expectedType": "POLICY_SEARCH",
+        "minMatchedPolicyCount": 1
+      }
+    ]
+  },
+  {
+    "name": "구체 프로필 후속 답변은 검색으로 이어진다",
+    "steps": [
+      {
+        "message": "돈이 없어서 생활이 힘들어",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      },
+      {
+        "message": "30대 초반이고 구직 중이에요",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      },
+      {
+        "message": "월세에 혼자 살아요",
+        "expectedType": "POLICY_SEARCH"
+      }
+    ]
+  },
+  {
+    "name": "잡담 인사는 스몰톡으로 분류한다",
+    "steps": [
+      {
+        "message": "안녕",
+        "expectedType": "SMALLTALK",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "감사 표현은 스몰톡으로 분류한다",
+    "steps": [
+      {
+        "message": "고마워",
+        "expectedType": "SMALLTALK",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "위험 표현은 안전 응답으로 분류한다",
+    "steps": [
+      {
+        "message": "죽고 싶어",
+        "expectedType": "SAFETY",
+        "answerContains": "109",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "응급 표현은 안전 응답으로 분류한다",
+    "steps": [
+      {
+        "message": "숨이 안 쉬어지고 너무 아파",
+        "expectedType": "SAFETY",
+        "answerContains": "119",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "축구 질문은 오프토픽으로 분류한다",
+    "steps": [
+      {
+        "message": "오늘 축구 경기 결과 알려줘",
+        "expectedType": "OFF_TOPIC",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "날씨 질문은 오프토픽으로 분류한다",
+    "steps": [
+      {
+        "message": "내일 날씨 알려줘",
+        "expectedType": "OFF_TOPIC",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  },
+  {
+    "name": "로그인 없는 새 세션은 독립적으로 동작한다",
+    "steps": [
+      {
+        "message": "청년 정책에 대해서 알려줘",
+        "expectedType": "CLARIFICATION_NEEDED",
+        "expectedMatchedPolicyCount": 0
+      },
+      {
+        "message": "안녕",
+        "expectedType": "SMALLTALK",
+        "expectedMatchedPolicyCount": 0
+      }
+    ]
+  }
+]
