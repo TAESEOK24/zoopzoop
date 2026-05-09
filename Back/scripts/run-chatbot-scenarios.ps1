@@ -5,6 +5,35 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = $OutputEncoding
+
+function Invoke-JsonUtf8 {
+    param(
+        [string] $Method,
+        [string] $Uri,
+        [string] $Body = $null
+    )
+
+    $client = New-Object System.Net.WebClient
+    try {
+        $client.Encoding = [System.Text.Encoding]::UTF8
+        $client.Headers.Set("Accept", "application/json")
+
+        if (-not [string]::IsNullOrEmpty($Body)) {
+            $client.Headers.Set("Content-Type", "application/json; charset=utf-8")
+            $requestBytes = [System.Text.Encoding]::UTF8.GetBytes($Body)
+            $responseBytes = $client.UploadData($Uri, $Method, $requestBytes)
+        } else {
+            $responseBytes = $client.DownloadData($Uri)
+        }
+
+        $content = [System.Text.Encoding]::UTF8.GetString($responseBytes)
+        return $content | ConvertFrom-Json
+    } finally {
+        $client.Dispose()
+    }
+}
 
 function Resolve-CasePath {
     param([string] $Path)
@@ -58,9 +87,9 @@ $askUrl = "$BaseUrl/api/chatbot/ask"
 $healthUrl = "$BaseUrl/api/chatbot/health"
 
 try {
-    Invoke-RestMethod -Method Get -Uri $healthUrl | Out-Null
+    Invoke-JsonUtf8 -Method Get -Uri $healthUrl | Out-Null
 } catch {
-    throw "Chatbot server is not reachable at $healthUrl. Start the backend first, then run this script again."
+    throw "Chatbot server is not reachable at $healthUrl. Start the backend first, then run this script again. Detail: $($_.Exception.Message)"
 }
 
 $scenarios = Get-Content -Encoding UTF8 -Raw $resolvedCasesPath | ConvertFrom-Json
@@ -83,11 +112,7 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
         $failures = New-Object System.Collections.Generic.List[string]
 
         try {
-            $response = Invoke-RestMethod `
-                -Method Post `
-                -Uri $askUrl `
-                -ContentType "application/json; charset=utf-8" `
-                -Body $body
+            $response = Invoke-JsonUtf8 -Method Post -Uri $askUrl -Body $body
 
             $data = $response.data
             $actualType = $data.responseType
