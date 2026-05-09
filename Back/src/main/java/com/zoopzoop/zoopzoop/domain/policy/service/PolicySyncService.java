@@ -5,13 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicyConditionsDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicyDetailDto;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicyListDto;
-import com.zoopzoop.zoopzoop.domain.policy.entity.PolicyConditions;
-import com.zoopzoop.zoopzoop.domain.policy.entity.PolicyDetail;
-import com.zoopzoop.zoopzoop.domain.policy.entity.PolicyList;
-import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyConditionsRepository;
-import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyDetailRepository;
-import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyListRepository;
 import java.net.URI;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,6 +16,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -30,12 +28,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class PolicySyncService {
 
+    private static final int JDBC_BATCH_SIZE = 1000;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final PolicyListRepository listRepo;
-    private final PolicyDetailRepository detailRepo;
-    private final PolicyConditionsRepository conditionsRepo;
+    private final JdbcTemplate jdbcTemplate;
+    private volatile boolean upsertIndexesReady;
 
     @Value("${gov.api.key}")
     private String serviceKey;
@@ -58,6 +56,116 @@ public class PolicySyncService {
     private static final String LIST_URL = "https://api.odcloud.kr/api/gov24/v3/serviceList";
     private static final String DETAIL_URL = "https://api.odcloud.kr/api/gov24/v3/serviceDetail";
     private static final String COND_URL = "https://api.odcloud.kr/api/gov24/v3/supportConditions";
+
+    private static final String LIST_UPSERT_SQL = """
+            insert into policies_list (
+                service_id, service_type, service_name, purpose_summary, target, selection_criteria,
+                support_content, application_method, application_deadline, detail_url, org_code, org_name,
+                department_name, view_count, org_type, user_type, service_field, receiving_org, contact_number,
+                created_at, updated_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict (service_id) do update set
+                service_type = excluded.service_type,
+                service_name = excluded.service_name,
+                purpose_summary = excluded.purpose_summary,
+                target = excluded.target,
+                selection_criteria = excluded.selection_criteria,
+                support_content = excluded.support_content,
+                application_method = excluded.application_method,
+                application_deadline = excluded.application_deadline,
+                detail_url = excluded.detail_url,
+                org_code = excluded.org_code,
+                org_name = excluded.org_name,
+                department_name = excluded.department_name,
+                view_count = excluded.view_count,
+                org_type = excluded.org_type,
+                user_type = excluded.user_type,
+                service_field = excluded.service_field,
+                receiving_org = excluded.receiving_org,
+                contact_number = excluded.contact_number,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+            """;
+
+    private static final String DETAIL_UPSERT_SQL = """
+            insert into policies_detail (
+                service_id, purpose, required_documents, receiving_org_name, contact_info, online_url,
+                org_name, admin_rule, local_rule, law, official_required_docs, user_required_docs, updated_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict (service_id) do update set
+                purpose = excluded.purpose,
+                required_documents = excluded.required_documents,
+                receiving_org_name = excluded.receiving_org_name,
+                contact_info = excluded.contact_info,
+                online_url = excluded.online_url,
+                org_name = excluded.org_name,
+                admin_rule = excluded.admin_rule,
+                local_rule = excluded.local_rule,
+                law = excluded.law,
+                official_required_docs = excluded.official_required_docs,
+                user_required_docs = excluded.user_required_docs,
+                updated_at = excluded.updated_at
+            """;
+
+    private static final String CONDITIONS_UPSERT_SQL = """
+            insert into policies_conditions (
+                service_id, service_name, ja0110, ja0111, ja0101, ja0102, ja0201, ja0202, ja0203, ja0204,
+                ja0205, ja0301, ja0302, ja0303, ja0313, ja0314, ja0315, ja0316, ja0317, ja0318,
+                ja0319, ja0320, ja0322, ja0326, ja0327, ja0401, ja0402, ja0403, ja0404, ja0410,
+                ja0411, ja0412, ja0413, ja0414, ja1101, ja1102, ja1103, ja1201, ja1202, ja1299,
+                ja2101, ja2102, ja2103, ja2201, ja2202, ja2203, ja2299, ja0328, ja0329, ja0330
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict (service_id) do update set
+                service_name = excluded.service_name,
+                ja0110 = excluded.ja0110,
+                ja0111 = excluded.ja0111,
+                ja0101 = excluded.ja0101,
+                ja0102 = excluded.ja0102,
+                ja0201 = excluded.ja0201,
+                ja0202 = excluded.ja0202,
+                ja0203 = excluded.ja0203,
+                ja0204 = excluded.ja0204,
+                ja0205 = excluded.ja0205,
+                ja0301 = excluded.ja0301,
+                ja0302 = excluded.ja0302,
+                ja0303 = excluded.ja0303,
+                ja0313 = excluded.ja0313,
+                ja0314 = excluded.ja0314,
+                ja0315 = excluded.ja0315,
+                ja0316 = excluded.ja0316,
+                ja0317 = excluded.ja0317,
+                ja0318 = excluded.ja0318,
+                ja0319 = excluded.ja0319,
+                ja0320 = excluded.ja0320,
+                ja0322 = excluded.ja0322,
+                ja0326 = excluded.ja0326,
+                ja0327 = excluded.ja0327,
+                ja0401 = excluded.ja0401,
+                ja0402 = excluded.ja0402,
+                ja0403 = excluded.ja0403,
+                ja0404 = excluded.ja0404,
+                ja0410 = excluded.ja0410,
+                ja0411 = excluded.ja0411,
+                ja0412 = excluded.ja0412,
+                ja0413 = excluded.ja0413,
+                ja0414 = excluded.ja0414,
+                ja1101 = excluded.ja1101,
+                ja1102 = excluded.ja1102,
+                ja1103 = excluded.ja1103,
+                ja1201 = excluded.ja1201,
+                ja1202 = excluded.ja1202,
+                ja1299 = excluded.ja1299,
+                ja2101 = excluded.ja2101,
+                ja2102 = excluded.ja2102,
+                ja2103 = excluded.ja2103,
+                ja2201 = excluded.ja2201,
+                ja2202 = excluded.ja2202,
+                ja2203 = excluded.ja2203,
+                ja2299 = excluded.ja2299,
+                ja0328 = excluded.ja0328,
+                ja0329 = excluded.ja0329,
+                ja0330 = excluded.ja0330
+            """;
 
     public String syncFullData() {
         int page = 1;
@@ -130,6 +238,8 @@ public class PolicySyncService {
     @Transactional
     public SyncPageResult fetchAndSaveAll(int page, int perPage) {
         try {
+            ensureUpsertIndexes();
+
             ApiPage<PolicyListDto> listPage = fetchFromApi(LIST_URL, page, perPage, PolicyListDto.class);
             saveList(listPage.items());
 
@@ -148,6 +258,23 @@ public class PolicySyncService {
         } catch (Exception e) {
             log.error("Policy sync failed", e);
             return SyncPageResult.failure("FAILED: " + e.getMessage());
+        }
+    }
+
+    private void ensureUpsertIndexes() {
+        if (upsertIndexesReady) {
+            return;
+        }
+
+        synchronized (this) {
+            if (upsertIndexesReady) {
+                return;
+            }
+
+            jdbcTemplate.execute("create unique index if not exists policies_list_service_id_uidx on policies_list (service_id)");
+            jdbcTemplate.execute("create unique index if not exists policies_detail_service_id_uidx on policies_detail (service_id)");
+            jdbcTemplate.execute("create unique index if not exists policies_conditions_service_id_uidx on policies_conditions (service_id)");
+            upsertIndexesReady = true;
         }
     }
 
@@ -202,126 +329,139 @@ public class PolicySyncService {
     }
 
     private void saveList(List<PolicyListDto> dtos) {
-        for (PolicyListDto dto : dtos) {
-            if (dto.serviceId() == null) {
-                continue;
-            }
+        List<PolicyListDto> validDtos = dtos.stream()
+                .filter(dto -> dto.serviceId() != null)
+                .toList();
 
-            listRepo.save(PolicyList.builder()
-                    .serviceId(dto.serviceId())
-                    .serviceType(dto.serviceType() != null ? dto.serviceType() : "-")
-                    .serviceName(dto.serviceName() != null ? dto.serviceName() : "N/A")
-                    .purposeSummary(dto.purposeSummary())
-                    .target(dto.target())
-                    .selectionCriteria(dto.selectionCriteria())
-                    .supportContent(dto.supportContent())
-                    .applicationMethod(dto.applicationMethod())
-                    .applicationDeadline(dto.applicationDeadline())
-                    .detailUrl(dto.detailUrl())
-                    .orgCode(dto.orgCode() != null ? dto.orgCode() : "-")
-                    .orgName(dto.orgName() != null ? dto.orgName() : "-")
-                    .departmentName(dto.departmentName())
-                    .viewCount(dto.viewCount() != null ? dto.viewCount() : 0)
-                    .orgType(dto.orgType())
-                    .userType(dto.userType())
-                    .serviceField(dto.serviceField())
-                    .receivingOrg(dto.receivingOrg())
-                    .contactNumber(dto.contactNumber())
-                    .createdAt(parseDateTime(dto.createdAt()))
-                    .updatedAt(parseDateTime(dto.updatedAt()))
-                    .build());
-        }
+        jdbcTemplate.batchUpdate(LIST_UPSERT_SQL, validDtos, JDBC_BATCH_SIZE, this::bindList);
     }
 
     private void saveDetail(List<PolicyDetailDto> dtos) {
-        for (PolicyDetailDto dto : dtos) {
-            if (dto.serviceId() == null) {
-                continue;
-            }
-            if (!listRepo.existsById(dto.serviceId())) {
-                continue;
-            }
+        List<PolicyDetailDto> validDtos = dtos.stream()
+                .filter(dto -> dto.serviceId() != null)
+                .toList();
 
-            detailRepo.save(PolicyDetail.builder()
-                    .serviceId(dto.serviceId())
-                    .purpose(dto.purpose() != null ? dto.purpose() : "-")
-                    .requiredDocuments(dto.requiredDocuments())
-                    .receivingOrgName(dto.receivingOrgName())
-                    .contactInfo(dto.contactInfo())
-                    .onlineUrl(dto.onlineUrl())
-                    .orgName(dto.orgName() != null ? dto.orgName() : "-")
-                    .adminRule(dto.adminRule())
-                    .localRule(dto.localRule())
-                    .law(dto.law())
-                    .officialRequiredDocs(dto.officialRequiredDocs())
-                    .userRequiredDocs(dto.userRequiredDocs())
-                    .updatedAt(parseDateTime(dto.updatedAt()))
-                    .build());
-        }
+        jdbcTemplate.batchUpdate(DETAIL_UPSERT_SQL, validDtos, JDBC_BATCH_SIZE, this::bindDetail);
     }
 
     private void saveConditions(List<PolicyConditionsDto> dtos) {
-        for (PolicyConditionsDto dto : dtos) {
-            if (dto.serviceId() == null) {
-                continue;
-            }
-            if (!listRepo.existsById(dto.serviceId())) {
-                continue;
-            }
+        List<PolicyConditionsDto> validDtos = dtos.stream()
+                .filter(dto -> dto.serviceId() != null)
+                .toList();
 
-            conditionsRepo.save(PolicyConditions.builder()
-                    .serviceId(dto.serviceId())
-                    .serviceName(dto.serviceName() != null ? dto.serviceName() : "-")
-                    .ja0110(dto.ja0110())
-                    .ja0111(dto.ja0111())
-                    .ja0101(dto.ja0101())
-                    .ja0102(dto.ja0102())
-                    .ja0201(dto.ja0201())
-                    .ja0202(dto.ja0202())
-                    .ja0203(dto.ja0203())
-                    .ja0204(dto.ja0204())
-                    .ja0205(dto.ja0205())
-                    .ja0301(dto.ja0301())
-                    .ja0302(dto.ja0302())
-                    .ja0303(dto.ja0303())
-                    .ja0313(dto.ja0313())
-                    .ja0314(dto.ja0314())
-                    .ja0315(dto.ja0315())
-                    .ja0316(dto.ja0316())
-                    .ja0317(dto.ja0317())
-                    .ja0318(dto.ja0318())
-                    .ja0319(dto.ja0319())
-                    .ja0320(dto.ja0320())
-                    .ja0322(dto.ja0322())
-                    .ja0326(dto.ja0326())
-                    .ja0327(dto.ja0327())
-                    .ja0401(dto.ja0401())
-                    .ja0402(dto.ja0402())
-                    .ja0403(dto.ja0403())
-                    .ja0404(dto.ja0404())
-                    .ja0410(dto.ja0410())
-                    .ja0411(dto.ja0411())
-                    .ja0412(dto.ja0412())
-                    .ja0413(dto.ja0413())
-                    .ja0414(dto.ja0414())
-                    .ja1101(dto.ja1101())
-                    .ja1102(dto.ja1102())
-                    .ja1103(dto.ja1103())
-                    .ja1201(dto.ja1201())
-                    .ja1202(dto.ja1202())
-                    .ja1299(dto.ja1299())
-                    .ja2101(dto.ja2101())
-                    .ja2102(dto.ja2102())
-                    .ja2103(dto.ja2103())
-                    .ja2201(dto.ja2201())
-                    .ja2202(dto.ja2202())
-                    .ja2203(dto.ja2203())
-                    .ja2299(dto.ja2299())
-                    .ja0328(dto.ja0328())
-                    .ja0329(dto.ja0329())
-                    .ja0330(dto.ja0330())
-                    .build());
+        jdbcTemplate.batchUpdate(CONDITIONS_UPSERT_SQL, validDtos, JDBC_BATCH_SIZE, this::bindConditions);
+    }
+
+    private void bindList(PreparedStatement ps, PolicyListDto dto) throws SQLException {
+        int index = 1;
+        ps.setString(index++, dto.serviceId());
+        ps.setString(index++, defaultString(dto.serviceType(), "-"));
+        ps.setString(index++, defaultString(dto.serviceName(), "N/A"));
+        ps.setString(index++, dto.purposeSummary());
+        ps.setString(index++, dto.target());
+        ps.setString(index++, dto.selectionCriteria());
+        ps.setString(index++, dto.supportContent());
+        ps.setString(index++, dto.applicationMethod());
+        ps.setString(index++, dto.applicationDeadline());
+        ps.setString(index++, dto.detailUrl());
+        ps.setString(index++, defaultString(dto.orgCode(), "-"));
+        ps.setString(index++, defaultString(dto.orgName(), "-"));
+        ps.setString(index++, dto.departmentName());
+        setInteger(ps, index++, dto.viewCount() != null ? dto.viewCount() : 0);
+        ps.setString(index++, dto.orgType());
+        ps.setString(index++, dto.userType());
+        ps.setString(index++, dto.serviceField());
+        ps.setString(index++, dto.receivingOrg());
+        ps.setString(index++, dto.contactNumber());
+        setDateTime(ps, index++, parseDateTime(dto.createdAt()));
+        setDateTime(ps, index, parseDateTime(dto.updatedAt()));
+    }
+
+    private void bindDetail(PreparedStatement ps, PolicyDetailDto dto) throws SQLException {
+        int index = 1;
+        ps.setString(index++, dto.serviceId());
+        ps.setString(index++, defaultString(dto.purpose(), "-"));
+        ps.setString(index++, dto.requiredDocuments());
+        ps.setString(index++, dto.receivingOrgName());
+        ps.setString(index++, dto.contactInfo());
+        ps.setString(index++, dto.onlineUrl());
+        ps.setString(index++, defaultString(dto.orgName(), "-"));
+        ps.setString(index++, dto.adminRule());
+        ps.setString(index++, dto.localRule());
+        ps.setString(index++, dto.law());
+        ps.setString(index++, dto.officialRequiredDocs());
+        ps.setString(index++, dto.userRequiredDocs());
+        setDateTime(ps, index, parseDateTime(dto.updatedAt()));
+    }
+
+    private void bindConditions(PreparedStatement ps, PolicyConditionsDto dto) throws SQLException {
+        int index = 1;
+        ps.setString(index++, dto.serviceId());
+        ps.setString(index++, defaultString(dto.serviceName(), "-"));
+        setInteger(ps, index++, dto.ja0110());
+        setInteger(ps, index++, dto.ja0111());
+        ps.setString(index++, dto.ja0101());
+        ps.setString(index++, dto.ja0102());
+        ps.setString(index++, dto.ja0201());
+        ps.setString(index++, dto.ja0202());
+        ps.setString(index++, dto.ja0203());
+        ps.setString(index++, dto.ja0204());
+        ps.setString(index++, dto.ja0205());
+        ps.setString(index++, dto.ja0301());
+        ps.setString(index++, dto.ja0302());
+        ps.setString(index++, dto.ja0303());
+        ps.setString(index++, dto.ja0313());
+        ps.setString(index++, dto.ja0314());
+        ps.setString(index++, dto.ja0315());
+        ps.setString(index++, dto.ja0316());
+        ps.setString(index++, dto.ja0317());
+        ps.setString(index++, dto.ja0318());
+        ps.setString(index++, dto.ja0319());
+        ps.setString(index++, dto.ja0320());
+        ps.setString(index++, dto.ja0322());
+        ps.setString(index++, dto.ja0326());
+        ps.setString(index++, dto.ja0327());
+        ps.setString(index++, dto.ja0401());
+        ps.setString(index++, dto.ja0402());
+        ps.setString(index++, dto.ja0403());
+        ps.setString(index++, dto.ja0404());
+        ps.setString(index++, dto.ja0410());
+        ps.setString(index++, dto.ja0411());
+        ps.setString(index++, dto.ja0412());
+        ps.setString(index++, dto.ja0413());
+        ps.setString(index++, dto.ja0414());
+        ps.setString(index++, dto.ja1101());
+        ps.setString(index++, dto.ja1102());
+        ps.setString(index++, dto.ja1103());
+        ps.setString(index++, dto.ja1201());
+        ps.setString(index++, dto.ja1202());
+        ps.setString(index++, dto.ja1299());
+        ps.setString(index++, dto.ja2101());
+        ps.setString(index++, dto.ja2102());
+        ps.setString(index++, dto.ja2103());
+        ps.setString(index++, dto.ja2201());
+        ps.setString(index++, dto.ja2202());
+        ps.setString(index++, dto.ja2203());
+        ps.setString(index++, dto.ja2299());
+        ps.setString(index++, dto.ja0328());
+        ps.setString(index++, dto.ja0329());
+        ps.setString(index, dto.ja0330());
+    }
+
+    private void setInteger(PreparedStatement ps, int index, Integer value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.INTEGER);
+            return;
         }
+        ps.setInt(index, value);
+    }
+
+    private void setDateTime(PreparedStatement ps, int index, LocalDateTime value) throws SQLException {
+        ps.setObject(index, value, Types.TIMESTAMP);
+    }
+
+    private String defaultString(String value, String defaultValue) {
+        return value != null ? value : defaultValue;
     }
 
     private LocalDateTime parseDateTime(String dateStr) {
