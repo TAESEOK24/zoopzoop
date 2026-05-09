@@ -2,6 +2,7 @@ package com.zoopzoop.zoopzoop.domain.chatbot.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -100,6 +101,26 @@ class ChatbotServiceTest {
         assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
         assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
         assertEquals(0, response.matchedPolicyCount());
+        assertEquals(4, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    void askClarifiesBroadYouthPolicyQuestionEvenWhenAiMisclassifies() {
+        when(conversationMemory.resolveSessionId("session-youth-ai")).thenReturn("session-youth-ai");
+        when(conversationMemory.getRecentMessages("session-youth-ai")).thenReturn(List.of());
+        when(chatbotAiClient.classifyIntent(
+                eq("청년 정책에 대해서 알려줘"),
+                org.mockito.ArgumentMatchers.anyList(),
+                anyBoolean(),
+                eq(ChatbotResponseType.POLICY_SEARCH)
+        )).thenReturn(ChatbotResponseType.OFF_TOPIC);
+
+        ChatbotAskResponse response = chatbotService.ask("session-youth-ai", "청년 정책에 대해서 알려줘");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
         assertEquals(4, response.suggestedReplies().size());
         verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
         verify(chatbotAiClient, never()).generateAnswer(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList());

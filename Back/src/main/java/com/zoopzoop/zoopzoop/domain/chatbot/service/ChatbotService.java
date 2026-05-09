@@ -48,10 +48,10 @@ public class ChatbotService {
         );
         ChatbotResponseType responseType = aiResponseType == null ? fallbackResponseType : aiResponseType;
 
-        ChatbotAskResponse response = switch (responseType) {
-            case POLICY_SEARCH -> isBroadYouthPolicyQuestion(message)
-                    ? buildYouthPolicyClarificationResponse(resolvedSessionId)
-                    : buildPolicySearchResponse(resolvedSessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
+        ChatbotAskResponse response = isBroadYouthPolicyQuestion(message)
+                ? buildYouthPolicyClarificationResponse(resolvedSessionId)
+                : switch (responseType) {
+            case POLICY_SEARCH -> buildPolicySearchResponse(resolvedSessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
             case CLARIFICATION_NEEDED -> buildClarificationResponse(resolvedSessionId, message, history);
             case SMALLTALK -> buildSimpleResponse(
                     resolvedSessionId,
