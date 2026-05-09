@@ -134,6 +134,8 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
                 ExpectedType = $step.expectedType
                 ActualType = $actualType
                 Matched = $actualMatchedPolicyCount
+                Answer = $actualAnswer
+                SuggestedLabels = $labels -join ", "
                 Failures = Format-Failures @($failures)
             })
         } catch {
@@ -146,6 +148,8 @@ for ($scenarioIndex = 0; $scenarioIndex -lt $scenarios.Count; $scenarioIndex++) 
                 ExpectedType = $step.expectedType
                 ActualType = ""
                 Matched = ""
+                Answer = ""
+                SuggestedLabels = ""
                 Failures = $_.Exception.Message
             })
         }
@@ -165,7 +169,7 @@ if ($failed -gt 0) {
     Write-Host "Failures:"
     $results |
         Where-Object { $_.Status -ne "PASS" } |
-        Format-List Status, Scenario, Step, Message, ExpectedType, ActualType, Matched, Failures
+        Format-List Status, Scenario, Step, Message, ExpectedType, ActualType, Matched, Answer, SuggestedLabels, Failures
 
     exit 1
 }
