@@ -1,6 +1,7 @@
 package com.zoopzoop.zoopzoop.domain.policy.repository;
 
 import com.zoopzoop.zoopzoop.domain.policy.entity.PolicyList;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,4 +33,6 @@ public interface PolicyListRepository extends JpaRepository<PolicyList, String>,
             order by p.viewCount desc, p.createdAt desc
             """)
     List<PolicyList> searchByOrganization(@Param("organization") String organization, Pageable pageable);
+
+    List<PolicyList> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime createdAfter, Pageable pageable);
 }
