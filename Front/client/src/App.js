@@ -4,6 +4,7 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MainPage from './pages/Main';
 import LoginPage from './pages/Login';
+import GoogleCallback from './pages/Login/GoogleCallback';
 import SignupPage from './pages/Signup';
 import CommunityPage from './pages/Community';
 import PostDetail from './pages/Community/PostDetail';
@@ -25,6 +26,7 @@ function App() {
                     <Routes>
                         <Route path="/" element={<MainPage />} />
                         <Route path="/login" element={<LoginPage />} />
+                        <Route path="/auth/google/callback" element={<GoogleCallback />} />
                         <Route path="/signup" element={<SignupPage />} />
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/post/:id" element={<PostDetail />} />
