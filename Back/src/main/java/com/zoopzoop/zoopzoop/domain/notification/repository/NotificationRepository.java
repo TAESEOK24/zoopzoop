@@ -26,6 +26,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @EntityGraph(attributePaths = "policy")
     Optional<Notification> findByIdAndUserId(Long id, Long userId);
 
+    void deleteByUserId(Long userId);
+
     @Modifying
     @Query("""
             update Notification n

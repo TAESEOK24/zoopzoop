@@ -35,3 +35,42 @@ export const signupAPI = async (email, password, name) => {
         throw error;
     }
 };
+
+// Google 로그인 URL 조회 요청
+export const getGoogleAuthUrlAPI = async () => {
+    try {
+        console.log(`[API Request] GET ${authApi.defaults.baseURL}/google/url`);
+        const response = await authApi.get('/google/url');
+        console.log(`[API Response] GET /google/url 성공:`, response.data);
+        return response.data;
+    } catch (error) {
+        console.error(`[API Error] GET /google/url 에러:`, error);
+        throw error;
+    }
+};
+
+// Google 로그인 콜백 요청 (code 검증 후 토큰 발급)
+export const googleLoginCallbackAPI = async (code) => {
+    try {
+        console.log(`[API Request] GET ${authApi.defaults.baseURL}/google/callback?code=${code}`);
+        const response = await authApi.get(`/google/callback?code=${encodeURIComponent(code)}`);
+        console.log(`[API Response] GET /google/callback 성공:`, response.data);
+        return response.data;
+    } catch (error) {
+        console.error(`[API Error] GET /google/callback 에러:`, error);
+        throw error;
+    }
+};
+
+// 비밀번호 찾기 요청 (임시 비밀번호 발급)
+export const resetPasswordAPI = async (email, name) => {
+    try {
+        console.log(`[API Request] POST ${authApi.defaults.baseURL}/password-reset`, { email, name });
+        const response = await authApi.post('/password-reset', { email, name });
+        console.log(`[API Response] POST /password-reset 성공:`, response.data);
+        return response.data;
+    } catch (error) {
+        console.error(`[API Error] POST /password-reset 에러:`, error);
+        throw error;
+    }
+};

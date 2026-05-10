@@ -11,6 +11,8 @@ public interface NotificationSettingRepository extends JpaRepository<Notificatio
     @EntityGraph(attributePaths = "user")
     Optional<NotificationSetting> findByUserId(Long userId);
 
+    void deleteByUserId(Long userId);
+
     @EntityGraph(attributePaths = "user")
     List<NotificationSetting> findByDeadlineSoonEnabledTrue();
 

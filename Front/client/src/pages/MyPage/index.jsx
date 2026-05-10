@@ -53,6 +53,26 @@ const MyPage = () => {
         fetchMyInfo();
     }, [navigate]);
 
+    const handleDeleteAccount = async () => {
+        if (!window.confirm('정말로 회원 탈퇴를 진행하시겠습니까?\n탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.')) {
+            return;
+        }
+
+        try {
+            await axiosInstance.delete('/api/users/me');
+            
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('userName');
+            window.dispatchEvent(new Event('loginStateChange'));
+            
+            alert('회원 탈퇴가 완료되었습니다. 그동안 이용해 주셔서 감사합니다.');
+            navigate('/');
+        } catch (error) {
+            console.error('회원 탈퇴 에러:', error);
+            alert(error.response?.data?.message || '회원 탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -82,7 +102,10 @@ const MyPage = () => {
                             <div className="space-y-1">
                                 <MenuButton label="비밀번호 변경" />
                                 <MenuButton label="알림 설정" onClick={() => navigate('/mypage/notifications')} />
-                                <button className="w-full rounded-xl p-3 text-left text-sm font-bold text-red-400 transition-colors hover:bg-red-50">
+                                <button 
+                                    onClick={handleDeleteAccount}
+                                    className="w-full rounded-xl p-3 text-left text-sm font-bold text-red-400 transition-colors hover:bg-red-50"
+                                >
                                     회원 탈퇴
                                 </button>
                             </div>
