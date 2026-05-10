@@ -7,6 +7,7 @@ import com.zoopzoop.zoopzoop.domain.user.entity.User;
 import com.zoopzoop.zoopzoop.domain.user.repository.UserRepository;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
 import com.zoopzoop.zoopzoop.global.security.jwt.JwtProvider;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -41,7 +42,7 @@ public class GoogleOAuthService {
             RestClient.Builder restClientBuilder,
             @Value("${oauth.google.client-id:}") String clientId,
             @Value("${oauth.google.client-secret:}") String clientSecret,
-            @Value("${oauth.google.backend-redirect-uri}") String redirectUri,
+            @Value("${oauth.google.authorization-redirect-uri}") String redirectUri,
             @Value("${oauth.google.auth-uri}") String authUri,
             @Value("${oauth.google.token-uri}") String tokenUri,
             @Value("${oauth.google.user-info-uri}") String userInfoUri
@@ -68,8 +69,8 @@ public class GoogleOAuthService {
                 .queryParam("redirect_uri", redirectUri)
                 .queryParam("access_type", "offline")
                 .queryParam("prompt", "select_account")
+                .encode(StandardCharsets.UTF_8)
                 .build()
-                .encode()
                 .toUriString();
     }
 
