@@ -41,7 +41,7 @@ public class GoogleOAuthService {
             RestClient.Builder restClientBuilder,
             @Value("${oauth.google.client-id:}") String clientId,
             @Value("${oauth.google.client-secret:}") String clientSecret,
-            @Value("${oauth.google.redirect-uri}") String redirectUri,
+            @Value("${oauth.google.backend-redirect-uri}") String redirectUri,
             @Value("${oauth.google.auth-uri}") String authUri,
             @Value("${oauth.google.token-uri}") String tokenUri,
             @Value("${oauth.google.user-info-uri}") String userInfoUri
