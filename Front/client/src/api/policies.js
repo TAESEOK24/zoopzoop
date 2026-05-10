@@ -62,6 +62,59 @@ export const fetchPolicyDetail = async (serviceId) => {
     return response.data;
 };
 
+export const fetchMyScrapIds = async () => {
+    const response = await policyApi.get('/scraps/me/ids');
+    return response.data;
+};
+
+export const fetchMyScraps = async ({ query = '', page = 0, size = 5 } = {}) => {
+    const response = await policyApi.get('/scraps/me', {
+        params: {
+            query: query || undefined,
+            page,
+            size,
+        },
+    });
+    return response.data;
+};
+
+export const addPolicyScrap = async (serviceId) => {
+    const response = await policyApi.post(`/${serviceId}/scraps`);
+    return response.data;
+};
+
+export const migrateLegacyScraps = async () => {
+    let legacyIds = [];
+
+    try {
+        legacyIds = JSON.parse(localStorage.getItem('likedPolicyIds') || '[]');
+    } catch {
+        localStorage.removeItem('likedPolicyIds');
+        return;
+    }
+
+    const uniqueIds = [...new Set(legacyIds)].filter(Boolean);
+    if (uniqueIds.length === 0) {
+        localStorage.removeItem('likedPolicyIds');
+        return;
+    }
+
+    const results = await Promise.allSettled(uniqueIds.map((serviceId) => addPolicyScrap(serviceId)));
+    const failedIds = uniqueIds.filter((_, index) => results[index].status === 'rejected');
+
+    if (failedIds.length === 0) {
+        localStorage.removeItem('likedPolicyIds');
+        return;
+    }
+
+    localStorage.setItem('likedPolicyIds', JSON.stringify(failedIds));
+};
+
+export const removePolicyScrap = async (serviceId) => {
+    const response = await policyApi.delete(`/${serviceId}/scraps`);
+    return response.data;
+};
+
 // Chatbot policy search
 export const searchPolicies = async (keyword, size = 5) => {
     const response = await policyApi.get('/search', {

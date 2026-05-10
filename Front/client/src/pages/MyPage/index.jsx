@@ -2,12 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronRight, ExternalLink, FileCheck, Heart, Mail, User } from 'lucide-react';
 import axiosInstance from '../../api/index';
-
-const likedPolicies = [
-    { id: 1, title: '청년 월세 지원 사업', category: '주거', agency: '국토교통부', dDay: 'D-15' },
-    { id: 2, title: 'K-Pass 교통비 환급', category: '교통', agency: '국토교통부', dDay: '상시' },
-    { id: 3, title: '청년 희망 적금', category: '금융', agency: '금융위원회', dDay: 'D-5' },
-];
+import { fetchMyScraps, migrateLegacyScraps } from '../../api/policies';
 
 const appliedPolicies = [
     { id: 101, title: '청년 내일 채움 공제', date: '2026.04.10', status: '심사 중', color: 'text-blue-600 bg-blue-50' },
@@ -17,6 +12,8 @@ const appliedPolicies = [
 const MyPage = () => {
     const navigate = useNavigate();
     const [userInfo, setUserInfo] = useState(null);
+    const [likedPolicies, setLikedPolicies] = useState([]);
+    const [likedPolicyTotal, setLikedPolicyTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('liked');
 
@@ -30,14 +27,26 @@ const MyPage = () => {
             }
 
             try {
-                const response = await axiosInstance.get('/api/users/me');
-                setUserInfo(response.data.data);
+                const userResponse = await axiosInstance.get('/api/users/me');
+                setUserInfo(userResponse.data.data);
             } catch (error) {
                 console.error('사용자 정보 조회 실패:', error);
                 alert('사용자 정보를 불러오지 못했습니다.');
                 navigate('/login');
+                return;
             } finally {
                 setLoading(false);
+            }
+
+            try {
+                await migrateLegacyScraps();
+                const scrapResponse = await fetchMyScraps({ page: 0, size: 5 });
+                setLikedPolicies(scrapResponse?.data?.items ?? []);
+                setLikedPolicyTotal(scrapResponse?.data?.totalElements ?? 0);
+            } catch (error) {
+                console.error('찜한 정책 조회 실패:', error);
+                setLikedPolicies([]);
+                setLikedPolicyTotal(0);
             }
         };
 
@@ -81,7 +90,13 @@ const MyPage = () => {
                     </div>
 
                     <div className="space-y-6 lg:col-span-2">
-                        <ActivityPanel activeTab={activeTab} setActiveTab={setActiveTab} />
+                        <ActivityPanel
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            likedPolicies={likedPolicies}
+                            likedPolicyTotal={likedPolicyTotal}
+                            navigate={navigate}
+                        />
 
                         <div className="relative overflow-hidden rounded-3xl bg-indigo-900 p-8 text-white">
                             <div className="relative z-10">
@@ -129,7 +144,7 @@ const ProfileCard = ({ userInfo }) => (
     </div>
 );
 
-const ActivityPanel = ({ activeTab, setActiveTab }) => (
+const ActivityPanel = ({ activeTab, setActiveTab, likedPolicies, likedPolicyTotal, navigate }) => (
     <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
         <div className="flex border-b border-gray-100">
             <button
@@ -139,7 +154,7 @@ const ActivityPanel = ({ activeTab, setActiveTab }) => (
                 }`}
             >
                 <Heart className={`h-4 w-4 ${activeTab === 'liked' ? 'fill-blue-600' : ''}`} />
-                <span>찜한 정책 ({likedPolicies.length})</span>
+                <span>찜한 정책 ({likedPolicyTotal})</span>
             </button>
             <button
                 onClick={() => setActiveTab('applied')}
@@ -155,21 +170,37 @@ const ActivityPanel = ({ activeTab, setActiveTab }) => (
         <div className="p-6">
             {activeTab === 'liked' ? (
                 <div className="space-y-4">
+                    {likedPolicies.length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm font-semibold text-gray-400">
+                            아직 찜한 정책이 없습니다.
+                        </div>
+                    )}
                     {likedPolicies.map((policy) => (
-                        <div key={policy.id} className="group flex items-center justify-between rounded-2xl border border-transparent bg-gray-50 p-4 transition-all hover:border-blue-200 hover:bg-white">
+                        <div key={policy.serviceId} className="group flex items-center justify-between rounded-2xl border border-transparent bg-gray-50 p-4 transition-all hover:border-blue-200 hover:bg-white">
                             <div>
                                 <div className="mb-1 flex items-center space-x-2">
-                                    <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">{policy.category}</span>
-                                    <span className="text-[10px] font-bold text-red-500">{policy.dDay}</span>
+                                    <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">{policy.serviceType || '정책'}</span>
+                                    <span className="text-[10px] font-bold text-red-500">{policy.applicationDeadline || '상시'}</span>
                                 </div>
-                                <h4 className="font-bold text-gray-900">{policy.title}</h4>
-                                <p className="mt-1 text-xs text-gray-400">{policy.agency}</p>
+                                <h4 className="font-bold text-gray-900">{policy.serviceName}</h4>
+                                <p className="mt-1 text-xs text-gray-400">{policy.orgName || '기관 정보 없음'}</p>
                             </div>
-                            <button className="p-2 text-gray-300 group-hover:text-blue-500">
+                            <button
+                                onClick={() => navigate(`/policies/${policy.serviceId}`)}
+                                className="p-2 text-gray-300 group-hover:text-blue-500"
+                            >
                                 <ChevronRight className="h-5 w-5" />
                             </button>
                         </div>
                     ))}
+                    {likedPolicies.length > 0 && (
+                        <button
+                            onClick={() => navigate('/mypage/scraps')}
+                            className="w-full rounded-2xl border border-blue-100 bg-white py-3 text-sm font-bold text-blue-600 transition hover:bg-blue-50"
+                        >
+                            찜한 정책 전체 보기
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-4">

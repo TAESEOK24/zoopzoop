@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, RefreshCcw, Search, X } from 'lucide-react';
-import { fetchPolicies, fetchPolicyTypes } from '../../api/policies';
+import { ChevronLeft, ChevronRight, RefreshCcw, Search, Star, X } from 'lucide-react';
+import { addPolicyScrap, fetchMyScrapIds, fetchPolicies, fetchPolicyTypes, migrateLegacyScraps, removePolicyScrap } from '../../api/policies';
 
 const PAGE_SIZE = 24;
 const sortOptions = [
@@ -148,6 +148,7 @@ const PolicyPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isTypeLoading, setIsTypeLoading] = useState(true);
     const [error, setError] = useState('');
+    const [likedPolicyIds, setLikedPolicyIds] = useState([]);
     const cityOptions = mainRegionInput ? regionHierarchy[mainRegionInput] ?? [] : [];
 
     useEffect(() => {
@@ -247,6 +248,37 @@ const PolicyPage = () => {
             cancelled = true;
         };
     }, [urlAge, urlQuery, urlRegion, urlSpecial]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const token = localStorage.getItem('accessToken');
+
+        if (!token) {
+            setLikedPolicyIds([]);
+            return undefined;
+        }
+
+        const loadMyScrapIds = async () => {
+            try {
+                await migrateLegacyScraps();
+                const result = await fetchMyScrapIds();
+
+                if (!cancelled) {
+                    setLikedPolicyIds(result?.data?.serviceIds ?? []);
+                }
+            } catch (err) {
+                if (!cancelled && err.response?.status === 401) {
+                    setLikedPolicyIds([]);
+                }
+            }
+        };
+
+        loadMyScrapIds();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const pageNumbers = useMemo(() => buildPageNumbers(pageInfo.page, pageInfo.totalPages), [pageInfo.page, pageInfo.totalPages]);
 
@@ -352,6 +384,28 @@ const PolicyPage = () => {
     const handlePageInputSubmit = () => {
         const parsedPage = parsePage(pageInput);
         movePage(parsedPage - 1);
+    };
+
+    const togglePolicyLike = async (serviceId) => {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            alert('로그인이 필요합니다.');
+            return;
+        }
+
+        const isLiked = likedPolicyIds.includes(serviceId);
+
+        try {
+            if (isLiked) {
+                await removePolicyScrap(serviceId);
+                setLikedPolicyIds((current) => current.filter((id) => id !== serviceId));
+            } else {
+                await addPolicyScrap(serviceId);
+                setLikedPolicyIds((current) => current.includes(serviceId) ? current : [...current, serviceId]);
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || '찜 상태를 변경하지 못했습니다.');
+        }
     };
 
     const currentSearch = searchParams.toString();
@@ -554,8 +608,22 @@ const PolicyPage = () => {
                                     {policies.map((policy) => (
                                         <article
                                             key={policy.serviceId}
-                                            className="group rounded-[28px] border border-white/70 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(95,120,255,0.18)]"
+                                            className="group relative rounded-[28px] border border-white/70 bg-white p-6 pr-14 shadow-[0_16px_45px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(95,120,255,0.18)]"
                                         >
+                                            <button
+                                                type="button"
+                                                onClick={() => togglePolicyLike(policy.serviceId)}
+                                                aria-label={likedPolicyIds.includes(policy.serviceId) ? '찜 해제' : '찜하기'}
+                                                className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-yellow-50 hover:text-yellow-400"
+                                            >
+                                                <Star
+                                                    className={`h-5 w-5 ${
+                                                        likedPolicyIds.includes(policy.serviceId)
+                                                            ? 'fill-yellow-400 text-yellow-400'
+                                                            : ''
+                                                    }`}
+                                                />
+                                            </button>
                                             <div className="space-y-2">
                                                 <div className="flex flex-wrap gap-2">
                                                     <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-bold text-[#4860e6]">{policy.serviceType || '정책'}</span>

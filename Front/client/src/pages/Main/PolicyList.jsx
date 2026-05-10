@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchPolicies } from '../../api/policies';
+import { Star } from 'lucide-react';
+import { addPolicyScrap, fetchMyScrapIds, fetchPolicies, migrateLegacyScraps, removePolicyScrap } from '../../api/policies';
 import { fetchPersonalizedRecommendations } from '../../api/recommendations';
 
 const PolicyList = ({ query, isLoggedIn }) => {
@@ -11,6 +12,7 @@ const PolicyList = ({ query, isLoggedIn }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [allowPersonalized, setAllowPersonalized] = useState(true);
+    const [likedPolicyIds, setLikedPolicyIds] = useState([]);
     const usePersonalized = isLoggedIn && !query.trim() && allowPersonalized;
 
     useEffect(() => {
@@ -18,6 +20,36 @@ const PolicyList = ({ query, isLoggedIn }) => {
             setAllowPersonalized(true);
         }
     }, [isLoggedIn, query]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!isLoggedIn) {
+            setLikedPolicyIds([]);
+            return undefined;
+        }
+
+        const loadMyScrapIds = async () => {
+            try {
+                await migrateLegacyScraps();
+                const result = await fetchMyScrapIds();
+
+                if (!cancelled) {
+                    setLikedPolicyIds(result?.data?.serviceIds ?? []);
+                }
+            } catch (err) {
+                if (!cancelled && err.response?.status === 401) {
+                    setLikedPolicyIds([]);
+                }
+            }
+        };
+
+        loadMyScrapIds();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isLoggedIn]);
 
     useEffect(() => {
         let cancelled = false;
@@ -101,6 +133,27 @@ const PolicyList = ({ query, isLoggedIn }) => {
         return <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-gray-500 shadow-sm">조건에 맞는 정책이 없습니다.</div>;
     }
 
+    const togglePolicyLike = async (serviceId) => {
+        if (!isLoggedIn) {
+            alert('로그인이 필요합니다.');
+            return;
+        }
+
+        const isLiked = likedPolicyIds.includes(serviceId);
+
+        try {
+            if (isLiked) {
+                await removePolicyScrap(serviceId);
+                setLikedPolicyIds((current) => current.filter((id) => id !== serviceId));
+            } else {
+                await addPolicyScrap(serviceId);
+                setLikedPolicyIds((current) => current.includes(serviceId) ? current : [...current, serviceId]);
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || '찜 상태를 변경하지 못했습니다.');
+        }
+    };
+
     return (
         <div className="space-y-4">
             <div className="text-sm text-gray-500">
@@ -110,7 +163,21 @@ const PolicyList = ({ query, isLoggedIn }) => {
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {policies.map((policy) => (
-                    <div key={policy.serviceId} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+                    <div key={policy.serviceId} className="relative rounded-2xl border border-gray-100 bg-white p-6 pr-14 shadow-sm transition-shadow hover:shadow-md">
+                        <button
+                            type="button"
+                            onClick={() => togglePolicyLike(policy.serviceId)}
+                            aria-label={likedPolicyIds.includes(policy.serviceId) ? '찜 해제' : '찜하기'}
+                            className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-yellow-50 hover:text-yellow-400"
+                        >
+                            <Star
+                                className={`h-5 w-5 ${
+                                    likedPolicyIds.includes(policy.serviceId)
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : ''
+                                }`}
+                            />
+                        </button>
                         <div className="mb-4 flex items-start justify-between gap-3">
                             <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-600">{policy.serviceType || '분류 미정'}</span>
                             <span className="text-right text-sm font-bold text-orange-500">{policy.applicationDeadline || '상시'}</span>
