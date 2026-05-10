@@ -30,7 +30,8 @@ function App() {
                         <Route path="/community/edit/:id" element={<CommunityEdit />} />
                         <Route path="/ai-chat" element={<AIChatPage />} />
                         <Route path="/policies" element={<PolicyPage />} />
-                        <Route path="/policy/:id" element={<PolicyDetail />} />
+                        <Route path="/policies/:serviceId" element={<PolicyDetail />} />
+                        <Route path="/policy/:serviceId" element={<PolicyDetail />} />
                         <Route path="/mypage" element={<MyPage />} /> {/* 🚀 마이페이지 라우트 추가 */}
                     </Routes>
                 </main>
