@@ -90,6 +90,8 @@ public interface MyScrapRepository extends JpaRepository<MyScrap, Long> {
             """)
     List<String> findPolicyIdsByUserId(@Param("userId") Long userId);
 
+    void deleteByUserId(Long userId);
+
     @Query("""
             select s
             from MyScrap s

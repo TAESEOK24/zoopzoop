@@ -1,9 +1,11 @@
 package com.zoopzoop.zoopzoop.domain.auth.controller;
 
 import com.zoopzoop.zoopzoop.domain.auth.dto.request.LoginRequest;
+import com.zoopzoop.zoopzoop.domain.auth.dto.request.PasswordResetRequest;
 import com.zoopzoop.zoopzoop.domain.auth.dto.request.SignupRequest;
 import com.zoopzoop.zoopzoop.domain.auth.dto.response.AuthResponse;
 import com.zoopzoop.zoopzoop.domain.auth.dto.response.OAuthRedirectResponse;
+import com.zoopzoop.zoopzoop.domain.auth.dto.response.PasswordResetResponse;
 import com.zoopzoop.zoopzoop.domain.auth.service.AuthService;
 import com.zoopzoop.zoopzoop.domain.auth.service.GoogleOAuthService;
 import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
@@ -38,6 +40,11 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
+    }
+
+    @PostMapping("/password-reset")
+    public ApiResponse<PasswordResetResponse> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        return ApiResponse.ok(authService.resetPassword(request));
     }
 
     @GetMapping("/google")
