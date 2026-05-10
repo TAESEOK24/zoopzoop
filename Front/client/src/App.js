@@ -14,6 +14,7 @@ import PolicyPage from './pages/Policy';
 import PolicyDetail from './pages/Policy/Detail';
 import MyPage from './pages/MyPage';
 import NotificationSettings from './pages/MyPage/NotificationSettings';
+import ScrapsPage from './pages/MyPage/Scraps';
 
 function App() {
     return (
@@ -35,6 +36,7 @@ function App() {
                         <Route path="/policy/:serviceId" element={<PolicyDetail />} />
                         <Route path="/mypage" element={<MyPage />} />
                         <Route path="/mypage/notifications" element={<NotificationSettings />} />
+                        <Route path="/mypage/scraps" element={<ScrapsPage />} />
                     </Routes>
                 </main>
                 <Footer />
