@@ -1,173 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Shield, Calendar, ChevronRight, Heart, FileCheck, ExternalLink } from 'lucide-react';
+import { Calendar, ChevronRight, ExternalLink, FileCheck, Heart, Mail, User } from 'lucide-react';
 import axiosInstance from '../../api/index';
+
+const likedPolicies = [
+    { id: 1, title: '청년 월세 지원 사업', category: '주거', agency: '국토교통부', dDay: 'D-15' },
+    { id: 2, title: 'K-Pass 교통비 환급', category: '교통', agency: '국토교통부', dDay: '상시' },
+    { id: 3, title: '청년 희망 적금', category: '금융', agency: '금융위원회', dDay: 'D-5' },
+];
+
+const appliedPolicies = [
+    { id: 101, title: '청년 내일 채움 공제', date: '2026.04.10', status: '심사 중', color: 'text-blue-600 bg-blue-50' },
+    { id: 102, title: '경기도 청년 기본 소득', date: '2026.03.15', status: '지급 완료', color: 'text-green-600 bg-green-50' },
+];
 
 const MyPage = () => {
     const navigate = useNavigate();
     const [userInfo, setUserInfo] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('liked'); // 'liked' 또는 'applied' 상태 관리
-
-    // 🚀 임시 데이터: 내가 찜한 정책
-    const likedPolicies = [
-        { id: 1, title: "청년 월세 지원 사업", category: "주거", agency: "국토교통부", dDay: "D-15" },
-        { id: 2, title: "K-Pass 교통비 환급", category: "교통", agency: "국토교통부", dDay: "상시" },
-        { id: 3, title: "청년 도약 계좌", category: "금융", agency: "금융위원회", dDay: "D-5" },
-    ];
-
-    // 🚀 임시 데이터: 내가 신청한 정책
-    const appliedPolicies = [
-        { id: 101, title: "청년 내일 채움 공제", date: "2026.04.10", status: "심사 중", color: "text-blue-600 bg-blue-50" },
-        { id: 102, title: "경기도 청년 기본 소득", date: "2026.03.15", status: "지급 완료", color: "text-green-600 bg-green-50" },
-    ];
+    const [activeTab, setActiveTab] = useState('liked');
 
     useEffect(() => {
         const fetchMyInfo = async () => {
             const token = localStorage.getItem('accessToken');
             if (!token) {
-                alert("로그인 후 이용해주세요.");
+                alert('로그인이 필요합니다.');
                 navigate('/login');
                 return;
             }
+
             try {
                 const response = await axiosInstance.get('/api/users/me');
                 setUserInfo(response.data.data);
             } catch (error) {
-                console.error("내 정보 불러오기 실패:", error);
-                alert("유저 정보를 불러오는데 실패했습니다.");
+                console.error('사용자 정보 조회 실패:', error);
+                alert('사용자 정보를 불러오지 못했습니다.');
                 navigate('/login');
             } finally {
                 setLoading(false);
             }
         };
+
         fetchMyInfo();
     }, [navigate]);
 
-    if (loading) return <div className="min-h-screen flex justify-center items-center bg-gray-50"><span className="text-xl font-bold text-blue-500">정보를 불러오는 중입니다... 🚀</span></div>;
-    if (!userInfo) return null;
+    if (loading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                <span className="text-xl font-bold text-blue-500">정보를 불러오는 중입니다...</span>
+            </div>
+        );
+    }
+
+    if (!userInfo) {
+        return null;
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 py-12">
-            <div className="max-w-4xl mx-auto px-4">
+            <div className="mx-auto max-w-4xl px-4">
                 <div className="mb-10">
-                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">마이페이지</h1>
-                    <p className="text-gray-500 mt-2 font-medium">내 계정 정보와 활동 내역을 한눈에 확인하세요.</p>
+                    <h1 className="text-3xl font-black tracking-tight text-gray-900">마이페이지</h1>
+                    <p className="mt-2 font-medium text-gray-500">계정 정보와 활동 내역을 확인하세요.</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* 왼쪽: 프로필 및 기본 정보 (1컬럼) */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                            <div className="bg-blue-600 p-8 text-center text-white">
-                                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md border border-white/30">
-                                    <User className="w-10 h-10 text-white" />
-                                </div>
-                                <h2 className="text-xl font-bold">{userInfo.name}님</h2>
-                                <p className="text-blue-100 text-sm mt-1 opacity-80">{userInfo.role === 'ADMIN' ? '관리자' : '일반 회원'}</p>
-                            </div>
-                            <div className="p-6 space-y-4">
-                                <div className="flex items-center space-x-3 text-sm">
-                                    <Mail className="w-4 h-4 text-gray-400" />
-                                    <span className="text-gray-600 truncate">{userInfo.email}</span>
-                                </div>
-                                <div className="flex items-center space-x-3 text-sm">
-                                    <Calendar className="w-4 h-4 text-gray-400" />
-                                    <span className="text-gray-600">2026.04.27 가입</span>
-                                </div>
-                                <button className="w-full mt-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
-                                    프로필 수정
-                                </button>
-                            </div>
-                        </div>
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <div className="space-y-6 lg:col-span-1">
+                        <ProfileCard userInfo={userInfo} />
 
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">계정 관리</h3>
+                        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <h3 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">계정 관리</h3>
                             <div className="space-y-1">
                                 <MenuButton label="비밀번호 변경" />
-                                <MenuButton label="알림 설정" />
-                                <button className="w-full text-left p-3 text-sm text-red-400 font-bold hover:bg-red-50 rounded-xl transition-colors">회원 탈퇴</button>
+                                <MenuButton label="알림 설정" onClick={() => navigate('/mypage/notifications')} />
+                                <button className="w-full rounded-xl p-3 text-left text-sm font-bold text-red-400 transition-colors hover:bg-red-50">
+                                    회원 탈퇴
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* 오른쪽: 활동 내역 (2컬럼) */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                            {/* 탭 헤더 */}
-                            <div className="flex border-b border-gray-100">
-                                <button
-                                    onClick={() => setActiveTab('liked')}
-                                    className={`flex-1 py-4 text-sm font-bold flex items-center justify-center space-x-2 transition-all ${activeTab === 'liked' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-400 hover:bg-gray-50'}`}
-                                >
-                                    <Heart className={`w-4 h-4 ${activeTab === 'liked' ? 'fill-blue-600' : ''}`} />
-                                    <span>찜한 정책 ({likedPolicies.length})</span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('applied')}
-                                    className={`flex-1 py-4 text-sm font-bold flex items-center justify-center space-x-2 transition-all ${activeTab === 'applied' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-400 hover:bg-gray-50'}`}
-                                >
-                                    <FileCheck className="w-4 h-4" />
-                                    <span>신청 현황 ({appliedPolicies.length})</span>
-                                </button>
-                            </div>
+                    <div className="space-y-6 lg:col-span-2">
+                        <ActivityPanel activeTab={activeTab} setActiveTab={setActiveTab} />
 
-                            {/* 탭 콘텐츠 */}
-                            <div className="p-6">
-                                {activeTab === 'liked' ? (
-                                    <div className="space-y-4">
-                                        {likedPolicies.map(policy => (
-                                            <div key={policy.id} className="group p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-blue-200 hover:bg-white transition-all flex justify-between items-center">
-                                                <div>
-                                                    <div className="flex items-center space-x-2 mb-1">
-                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded uppercase">{policy.category}</span>
-                                                        <span className="text-[10px] text-red-500 font-bold">{policy.dDay}</span>
-                                                    </div>
-                                                    <h4 className="text-gray-900 font-bold">{policy.title}</h4>
-                                                    <p className="text-xs text-gray-400 mt-1">{policy.agency}</p>
-                                                </div>
-                                                <button className="p-2 text-gray-300 group-hover:text-blue-500">
-                                                    <ChevronRight className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {appliedPolicies.map(item => (
-                                            <div key={item.id} className="p-4 border border-gray-100 rounded-2xl flex justify-between items-center">
-                                                <div className="flex items-center space-x-4">
-                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs ${item.color}`}>
-                                                        {item.status.split(' ')[0]}
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-gray-900 font-bold">{item.title}</h4>
-                                                        <p className="text-xs text-gray-400 mt-1">신청일: {item.date}</p>
-                                                    </div>
-                                                </div>
-                                                <button className="flex items-center space-x-1 text-xs font-bold text-gray-400 hover:text-blue-600">
-                                                    <span>상세보기</span>
-                                                    <ExternalLink className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 홍보 배너/팁 영역 */}
-                        <div className="bg-indigo-900 rounded-3xl p-8 text-white relative overflow-hidden group">
+                        <div className="relative overflow-hidden rounded-3xl bg-indigo-900 p-8 text-white">
                             <div className="relative z-10">
-                                <h4 className="text-xl font-bold mb-2">맞춤형 정책 알림을 받아보세요! 🔔</h4>
-                                <p className="text-indigo-200 text-sm font-medium opacity-90">
-                                    관심 카테고리를 설정하면 새로운 정책이 등록될 때<br/>가장 먼저 알려드립니다.
+                                <h4 className="mb-2 text-xl font-bold">맞춤 정책 알림을 받아보세요</h4>
+                                <p className="text-sm font-medium text-indigo-200">
+                                    관심 알림을 설정하면 새 정책과 마감 임박 정책을 더 빠르게 확인할 수 있습니다.
                                 </p>
-                                <button className="mt-6 px-6 py-2 bg-white text-indigo-900 font-bold rounded-xl text-sm hover:bg-indigo-50 transition-colors">
-                                    알림 설정하러 가기
+                                <button
+                                    onClick={() => navigate('/mypage/notifications')}
+                                    className="mt-6 rounded-xl bg-white px-6 py-2 text-sm font-bold text-indigo-900 transition-colors hover:bg-indigo-50"
+                                >
+                                    알림 설정으로 이동
                                 </button>
                             </div>
-                            <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
                         </div>
                     </div>
                 </div>
@@ -176,10 +104,102 @@ const MyPage = () => {
     );
 };
 
-const MenuButton = ({ label }) => (
-    <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors group">
-        <span className="text-gray-600 text-sm font-bold group-hover:text-blue-600">{label}</span>
-        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+const ProfileCard = ({ userInfo }) => (
+    <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+        <div className="bg-blue-600 p-8 text-center text-white">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl border border-white/30 bg-white/20">
+                <User className="h-10 w-10 text-white" />
+            </div>
+            <h2 className="text-xl font-bold">{userInfo.name}</h2>
+            <p className="mt-1 text-sm text-blue-100 opacity-80">{userInfo.role === 'ADMIN' ? '관리자' : '일반 회원'}</p>
+        </div>
+        <div className="space-y-4 p-6">
+            <div className="flex items-center space-x-3 text-sm">
+                <Mail className="h-4 w-4 text-gray-400" />
+                <span className="truncate text-gray-600">{userInfo.email}</span>
+            </div>
+            <div className="flex items-center space-x-3 text-sm">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-600">가입 회원</span>
+            </div>
+            <button className="mt-4 w-full rounded-xl bg-blue-50 py-2 text-sm font-bold text-blue-600 transition-colors hover:bg-blue-100">
+                프로필 수정
+            </button>
+        </div>
+    </div>
+);
+
+const ActivityPanel = ({ activeTab, setActiveTab }) => (
+    <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+        <div className="flex border-b border-gray-100">
+            <button
+                onClick={() => setActiveTab('liked')}
+                className={`flex flex-1 items-center justify-center space-x-2 py-4 text-sm font-bold transition-all ${
+                    activeTab === 'liked' ? 'border-b-2 border-blue-600 bg-blue-50/30 text-blue-600' : 'text-gray-400 hover:bg-gray-50'
+                }`}
+            >
+                <Heart className={`h-4 w-4 ${activeTab === 'liked' ? 'fill-blue-600' : ''}`} />
+                <span>찜한 정책 ({likedPolicies.length})</span>
+            </button>
+            <button
+                onClick={() => setActiveTab('applied')}
+                className={`flex flex-1 items-center justify-center space-x-2 py-4 text-sm font-bold transition-all ${
+                    activeTab === 'applied' ? 'border-b-2 border-blue-600 bg-blue-50/30 text-blue-600' : 'text-gray-400 hover:bg-gray-50'
+                }`}
+            >
+                <FileCheck className="h-4 w-4" />
+                <span>신청 현황 ({appliedPolicies.length})</span>
+            </button>
+        </div>
+
+        <div className="p-6">
+            {activeTab === 'liked' ? (
+                <div className="space-y-4">
+                    {likedPolicies.map((policy) => (
+                        <div key={policy.id} className="group flex items-center justify-between rounded-2xl border border-transparent bg-gray-50 p-4 transition-all hover:border-blue-200 hover:bg-white">
+                            <div>
+                                <div className="mb-1 flex items-center space-x-2">
+                                    <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">{policy.category}</span>
+                                    <span className="text-[10px] font-bold text-red-500">{policy.dDay}</span>
+                                </div>
+                                <h4 className="font-bold text-gray-900">{policy.title}</h4>
+                                <p className="mt-1 text-xs text-gray-400">{policy.agency}</p>
+                            </div>
+                            <button className="p-2 text-gray-300 group-hover:text-blue-500">
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {appliedPolicies.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between rounded-2xl border border-gray-100 p-4">
+                            <div className="flex items-center space-x-4">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-xs font-bold ${item.color}`}>
+                                    {item.status.split(' ')[0]}
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-900">{item.title}</h4>
+                                    <p className="mt-1 text-xs text-gray-400">신청일 {item.date}</p>
+                                </div>
+                            </div>
+                            <button className="flex items-center space-x-1 text-xs font-bold text-gray-400 hover:text-blue-600">
+                                <span>상세보기</span>
+                                <ExternalLink className="h-3 w-3" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    </div>
+);
+
+const MenuButton = ({ label, onClick }) => (
+    <button onClick={onClick} className="group flex w-full items-center justify-between rounded-xl p-3 transition-colors hover:bg-gray-50">
+        <span className="text-sm font-bold text-gray-600 group-hover:text-blue-600">{label}</span>
+        <ChevronRight className="h-4 w-4 text-gray-300 transition-all group-hover:translate-x-1 group-hover:text-blue-500" />
     </button>
 );
 

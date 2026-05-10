@@ -1,0 +1,183 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { BadgePlus, Bell, ChevronLeft, Clock, Mail, Monitor, Moon, Save, Sparkles } from 'lucide-react';
+
+const DEFAULT_SETTINGS = {
+    deadlineSoon: true,
+    newPolicy: true,
+    recommendedPolicy: true,
+    browser: true,
+    email: false,
+    quietHours: false,
+};
+
+const NotificationSettings = () => {
+    const navigate = useNavigate();
+    const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+    const [savedMessage, setSavedMessage] = useState('');
+
+    useEffect(() => {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            alert('로그인이 필요합니다.');
+            navigate('/login');
+            return;
+        }
+
+        const savedSettings = localStorage.getItem('notificationSettings');
+        if (!savedSettings) {
+            return;
+        }
+
+        try {
+            setSettings({
+                ...DEFAULT_SETTINGS,
+                ...JSON.parse(savedSettings),
+            });
+        } catch {
+            localStorage.removeItem('notificationSettings');
+        }
+    }, [navigate]);
+
+    const handleToggle = (key) => {
+        setSettings((current) => ({
+            ...current,
+            [key]: !current[key],
+        }));
+        setSavedMessage('');
+    };
+
+    const handleSave = () => {
+        localStorage.setItem('notificationSettings', JSON.stringify(settings));
+        setSavedMessage('알림 설정이 저장되었습니다.');
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 py-12">
+            <div className="mx-auto max-w-4xl px-4">
+                <button
+                    onClick={() => navigate('/mypage')}
+                    className="mb-6 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 transition-colors hover:border-blue-200 hover:text-blue-600"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                    마이페이지로 돌아가기
+                </button>
+
+                <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                    <div className="border-b border-gray-100 p-8">
+                        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                                    <Bell className="h-6 w-6" />
+                                </div>
+                                <h1 className="text-3xl font-black tracking-tight text-gray-900">알림 설정</h1>
+                                <p className="mt-2 text-sm font-medium text-gray-500">
+                                    받고 싶은 정책 알림과 수신 방식을 선택하세요.
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleSave}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                            >
+                                <Save className="h-4 w-4" />
+                                저장
+                            </button>
+                        </div>
+
+                        {savedMessage && (
+                            <p className="mt-5 rounded-xl bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
+                                {savedMessage}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="space-y-8 p-8">
+                        <section>
+                            <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">알림 종류</h2>
+                            <div className="space-y-3">
+                                <SettingRow
+                                    icon={Clock}
+                                    title="신청 마감 임박 정책"
+                                    description="마감일이 가까운 정책을 놓치지 않도록 알려줍니다."
+                                    checked={settings.deadlineSoon}
+                                    onToggle={() => handleToggle('deadlineSoon')}
+                                />
+                                <SettingRow
+                                    icon={BadgePlus}
+                                    title="신규 등록 정책"
+                                    description="새로 등록된 정책을 빠르게 확인할 수 있습니다."
+                                    checked={settings.newPolicy}
+                                    onToggle={() => handleToggle('newPolicy')}
+                                />
+                                <SettingRow
+                                    icon={Sparkles}
+                                    title="개인 맞춤 추천 정책"
+                                    description="최근 조회와 검색 이력을 바탕으로 맞춤 정책을 추천합니다."
+                                    checked={settings.recommendedPolicy}
+                                    onToggle={() => handleToggle('recommendedPolicy')}
+                                />
+                            </div>
+                        </section>
+
+                        <section>
+                            <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">수신 방식</h2>
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <SettingRow
+                                    compact
+                                    icon={Monitor}
+                                    title="브라우저 알림"
+                                    description="서비스 이용 중 알림을 표시합니다."
+                                    checked={settings.browser}
+                                    onToggle={() => handleToggle('browser')}
+                                />
+                                <SettingRow
+                                    compact
+                                    icon={Mail}
+                                    title="이메일 알림"
+                                    description="가입 이메일로 알림을 받습니다."
+                                    checked={settings.email}
+                                    onToggle={() => handleToggle('email')}
+                                />
+                            </div>
+                        </section>
+
+                        <section>
+                            <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">시간 설정</h2>
+                            <SettingRow
+                                icon={Moon}
+                                title="방해 금지 시간"
+                                description="밤 10시부터 아침 8시까지 알림을 보내지 않습니다."
+                                checked={settings.quietHours}
+                                onToggle={() => handleToggle('quietHours')}
+                            />
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SettingRow = ({ icon: Icon, title, description, checked, onToggle, compact = false }) => (
+    <div className={`flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white shadow-sm ${compact ? 'p-4' : 'p-5'}`}>
+        <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+                <p className="font-bold text-gray-900">{title}</p>
+                <p className="mt-1 text-sm leading-5 text-gray-500">{description}</p>
+            </div>
+        </div>
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={checked}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-gray-200'}`}
+        >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${checked ? 'left-6' : 'left-1'}`} />
+        </button>
+    </div>
+);
+
+export default NotificationSettings;
