@@ -12,7 +12,8 @@ import CommunityEdit from './pages/Community/CommunityEdit';
 import AIChatPage from './pages/AIChat';
 import PolicyPage from './pages/Policy';
 import PolicyDetail from './pages/Policy/Detail';
-import MyPage from './pages/MyPage'; // 🚀 마이페이지 임포트
+import MyPage from './pages/MyPage';
+import NotificationSettings from './pages/MyPage/NotificationSettings';
 
 function App() {
     return (
@@ -32,7 +33,8 @@ function App() {
                         <Route path="/policies" element={<PolicyPage />} />
                         <Route path="/policies/:serviceId" element={<PolicyDetail />} />
                         <Route path="/policy/:serviceId" element={<PolicyDetail />} />
-                        <Route path="/mypage" element={<MyPage />} /> {/* 🚀 마이페이지 라우트 추가 */}
+                        <Route path="/mypage" element={<MyPage />} />
+                        <Route path="/mypage/notifications" element={<NotificationSettings />} />
                     </Routes>
                 </main>
                 <Footer />
