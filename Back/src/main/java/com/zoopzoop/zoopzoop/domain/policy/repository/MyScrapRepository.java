@@ -89,4 +89,14 @@ public interface MyScrapRepository extends JpaRepository<MyScrap, Long> {
             where s.user.id = :userId
             """)
     List<String> findPolicyIdsByUserId(@Param("userId") Long userId);
+
+    @Query("""
+            select s
+            from MyScrap s
+            join fetch s.user
+            join fetch s.policy
+            where s.user.id in :userIds
+            order by s.user.id asc, s.createdAt desc
+            """)
+    List<MyScrap> findByUserIdsWithPolicy(@Param("userIds") List<Long> userIds);
 }

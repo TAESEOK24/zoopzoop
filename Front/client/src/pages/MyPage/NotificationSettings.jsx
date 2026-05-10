@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BadgePlus, Bell, ChevronLeft, Clock, Mail, Monitor, Moon, Save, Sparkles } from 'lucide-react';
+import { BadgePlus, Bell, ChevronLeft, Clock, Mail, Monitor, Save, Sparkles } from 'lucide-react';
+import { fetchNotificationSettings, updateNotificationSettings } from '../../api/notifications';
 
 const DEFAULT_SETTINGS = {
     deadlineSoon: true,
@@ -8,15 +9,16 @@ const DEFAULT_SETTINGS = {
     recommendedPolicy: true,
     browser: true,
     email: false,
-    quietHours: false,
 };
 
 const NotificationSettings = () => {
     const navigate = useNavigate();
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
     const [savedMessage, setSavedMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let cancelled = false;
         const token = localStorage.getItem('accessToken');
         if (!token) {
             alert('로그인이 필요합니다.');
@@ -24,19 +26,33 @@ const NotificationSettings = () => {
             return;
         }
 
-        const savedSettings = localStorage.getItem('notificationSettings');
-        if (!savedSettings) {
-            return;
-        }
+        const loadSettings = async () => {
+            try {
+                const result = await fetchNotificationSettings();
 
-        try {
-            setSettings({
-                ...DEFAULT_SETTINGS,
-                ...JSON.parse(savedSettings),
-            });
-        } catch {
-            localStorage.removeItem('notificationSettings');
-        }
+                if (!cancelled) {
+                    setSettings({
+                        ...DEFAULT_SETTINGS,
+                        ...(result?.data ?? {}),
+                    });
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    alert(error.response?.data?.message || '알림 설정을 불러오지 못했습니다.');
+                    navigate('/mypage');
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadSettings();
+
+        return () => {
+            cancelled = true;
+        };
     }, [navigate]);
 
     const handleToggle = (key) => {
@@ -47,10 +63,27 @@ const NotificationSettings = () => {
         setSavedMessage('');
     };
 
-    const handleSave = () => {
-        localStorage.setItem('notificationSettings', JSON.stringify(settings));
-        setSavedMessage('알림 설정이 저장되었습니다.');
+    const handleSave = async () => {
+        try {
+            const result = await updateNotificationSettings(settings);
+            setSettings({
+                ...DEFAULT_SETTINGS,
+                ...(result?.data ?? {}),
+            });
+            setSavedMessage('알림 설정이 저장되었습니다.');
+        } catch (error) {
+            setSavedMessage('');
+            alert(error.response?.data?.message || '알림 설정을 저장하지 못했습니다.');
+        }
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                <span className="text-xl font-bold text-blue-500">알림 설정을 불러오는 중입니다...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 py-12">
@@ -139,17 +172,6 @@ const NotificationSettings = () => {
                                     onToggle={() => handleToggle('email')}
                                 />
                             </div>
-                        </section>
-
-                        <section>
-                            <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">시간 설정</h2>
-                            <SettingRow
-                                icon={Moon}
-                                title="방해 금지 시간"
-                                description="밤 10시부터 아침 8시까지 알림을 보내지 않습니다."
-                                checked={settings.quietHours}
-                                onToggle={() => handleToggle('quietHours')}
-                            />
                         </section>
                     </div>
                 </div>
