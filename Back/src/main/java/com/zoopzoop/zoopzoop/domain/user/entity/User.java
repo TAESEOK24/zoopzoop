@@ -1,19 +1,8 @@
 package com.zoopzoop.zoopzoop.domain.user.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Getter
 @Builder
@@ -36,14 +25,37 @@ public class User {
     @Column(nullable = false, length = 50)
     private String name;
 
-    // 🚀 [추가됨] 프로필 이미지 URL 저장 필드
     @Column(length = 500)
     private String profileImageUrl;
 
+    // 상세 프로필 필드들
+    private Integer age;
+
+    @Column(length = 10)
+    private String gender; // MALE, FEMALE
+
+    @Column(length = 100)
+    private String region; // 시/도
+
+    @Column(length = 100)
+    private String district; // 구/군
+
+    @Column(length = 20)
+    private String maritalStatus; // SINGLE, MARRIED
+
+    @Column(length = 50)
+    private String employmentStatus; // EMPLOYED, UNEMPLOYED 등
+
+    private Integer householdSize;
+    private Integer income;
+    private Integer incomeBracket; // 소득 구간 (1~10구간)
+
+    // 🚀 DB의 대소문자 혼용 문제를 해결하기 위한 유연한 Converter 적용
+    @Convert(converter = RoleConverter.class)
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -52,31 +64,35 @@ public class User {
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 통합 업데이트 메서드
+    public void updateProfile(String name, String email, String profileImageUrl,
+                              Integer age, String gender, String region, String district,
+                              String maritalStatus, String employmentStatus,
+                              Integer householdSize, Integer income, Integer incomeBracket) {
+        if (name != null) this.name = name;
+        if (email != null) this.email = email;
+        this.profileImageUrl = profileImageUrl;
+        this.age = age;
+        this.gender = gender;
+        this.region = region;
+        this.district = district;
+        this.maritalStatus = maritalStatus;
+        this.employmentStatus = employmentStatus;
+        this.householdSize = householdSize;
+        this.income = income;
+        this.incomeBracket = incomeBracket;
     }
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
-    }
-
-    // ==========================================
-    // 🚀 [추가됨] 정보 수정용 메서드들 모음
-    // ==========================================
-    public void updateName(String name) {
-        this.name = name;
-    }
-
-    public void updateEmail(String email) {
-        this.email = email;
-    }
-
-    public void updateProfileImage(String profileImageUrl) {
-        this.profileImageUrl = profileImageUrl;
     }
 }

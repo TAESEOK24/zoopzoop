@@ -16,6 +16,7 @@ import PolicyDetail from './pages/Policy/Detail';
 import MyPage from './pages/MyPage';
 import NotificationSettings from './pages/MyPage/NotificationSettings';
 import ScrapsPage from './pages/MyPage/Scraps';
+import MyPageSettings from './pages/MyPage/Settings';
 
 function App() {
     return (
@@ -37,6 +38,7 @@ function App() {
                         <Route path="/policies/:serviceId" element={<PolicyDetail />} />
                         <Route path="/policy/:serviceId" element={<PolicyDetail />} />
                         <Route path="/mypage" element={<MyPage />} />
+                        <Route path="/mypage/settings" element={<MyPageSettings />} />  {/* 🚀 여기 추가! */}
                         <Route path="/mypage/notifications" element={<NotificationSettings />} />
                         <Route path="/mypage/scraps" element={<ScrapsPage />} />
                     </Routes>
