@@ -3,6 +3,9 @@ package com.zoopzoop.zoopzoop.domain.community.controller;
 import com.zoopzoop.zoopzoop.domain.community.dto.*;
 import com.zoopzoop.zoopzoop.domain.community.service.CommunityService;
 import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
+// 🚀 [추가됨] 인증 관련 임포트
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.zoopzoop.zoopzoop.global.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -65,7 +68,7 @@ public class CommunityController {
         return ApiResponse.ok("댓글 등록 완료");
     }
 
-    // 🚀 [추가됨] 댓글 수정
+    // 댓글 수정
     @PutMapping("/comments/{commentId}")
     public ApiResponse<String> updateComment(@PathVariable Long commentId, @RequestBody CommentDto.Request request) {
         communityService.updateComment(commentId, request);
@@ -77,5 +80,19 @@ public class CommunityController {
     public ApiResponse<String> deleteComment(@PathVariable Long commentId) {
         communityService.deleteComment(commentId);
         return ApiResponse.ok("댓글 삭제 완료");
+    }
+
+    // ================= 🚀 [추가됨] 마이페이지 활동내역 API ================= //
+
+    // 내가 쓴 게시글 조회 API
+    @GetMapping("/my-posts")
+    public ApiResponse<List<PostResponse>> getMyPosts(@AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.ok(communityService.getMyPosts(currentUser.id()));
+    }
+
+    // 내가 쓴 댓글 조회 API
+    @GetMapping("/my-comments")
+    public ApiResponse<List<CommentDto.Response>> getMyComments(@AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ApiResponse.ok(communityService.getMyComments(currentUser.id()));
     }
 }
