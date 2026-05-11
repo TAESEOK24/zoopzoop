@@ -5,7 +5,7 @@ import com.zoopzoop.zoopzoop.domain.notification.repository.NotificationSettingR
 import com.zoopzoop.zoopzoop.domain.policy.repository.MyScrapRepository;
 import com.zoopzoop.zoopzoop.domain.searchlog.repository.SearchLogRepository;
 import com.zoopzoop.zoopzoop.domain.user.dto.UserSummary;
-import com.zoopzoop.zoopzoop.domain.user.dto.UserUpdateRequest; // 🚀 DTO 임포트
+import com.zoopzoop.zoopzoop.domain.user.dto.UserUpdateRequest;
 import com.zoopzoop.zoopzoop.domain.user.entity.User;
 import com.zoopzoop.zoopzoop.domain.user.repository.UserRepository;
 import com.zoopzoop.zoopzoop.global.exception.AppException;
@@ -56,25 +56,81 @@ public class UserService {
         return UserSummary.from(user);
     }
 
-    // 🚀 [고도화됨] 프로필 통합 수정 (이름, 이메일, 이미지)
+    /**
+     * 2026년 가구원 수별 기준 중위소득 100% 금액 (월 단위, 원)
+     */
+    private double getMedianIncome2026(int householdSize) {
+        return switch (householdSize) {
+            case 1 -> 2564238.0;
+            case 2 -> 4199292.0;
+            case 3 -> 5359036.0;
+            case 4 -> 6494738.0;
+            case 5 -> 7556719.0;
+            case 6 -> 8555952.0;
+            case 7 -> 9515150.0;
+            default -> 9515150.0 + ((householdSize - 7) * 959198.0);
+        };
+    }
+
+    /**
+     * 중위소득 백분율을 기준으로 소득 구간(1~10) 결정
+     */
+    private Integer convertToBracket(double percent) {
+        if (percent <= 30) return 1;
+        if (percent <= 50) return 2;
+        if (percent <= 70) return 3;
+        if (percent <= 90) return 4;
+        if (percent <= 100) return 5;
+        if (percent <= 130) return 6;
+        if (percent <= 150) return 7;
+        if (percent <= 200) return 8;
+        if (percent <= 300) return 9;
+        return 10;
+    }
+
+    /**
+     * 가구원 수와 연 소득을 바탕으로 소득 구간을 자동 계산
+     */
+    private Integer calculateIncomeBracket(Integer householdSize, Integer annualIncome) {
+        if (householdSize == null || annualIncome == null || householdSize <= 0) {
+            return null;
+        }
+
+        // 연 소득(만원) -> 월 소득(원) 변환
+        double monthlyIncomeWon = (annualIncome * 10000.0) / 12.0;
+        double baseMedian = getMedianIncome2026(householdSize);
+        double percent = (monthlyIncomeWon / baseMedian) * 100;
+
+        return convertToBracket(percent);
+    }
+
+    /**
+     * 프로필 및 맞춤 정보 업데이트
+     */
     @Transactional
     public void updateProfile(Long userId, UserUpdateRequest.Profile request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(404, "사용자를 찾을 수 없습니다."));
 
-        // 프론트엔드에서 데이터가 넘어왔을 때만 변경하도록 안전장치 설정
-        if (request.getName() != null && !request.getName().trim().isEmpty()) {
-            user.updateName(request.getName());
-        }
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            user.updateEmail(request.getEmail());
-        }
-        if (request.getProfileImageUrl() != null) {
-            user.updateProfileImage(request.getProfileImageUrl());
-        }
+        // 소득 구간 자동 계산 (사용자 직접 수정 불가)
+        Integer autoCalculatedBracket = calculateIncomeBracket(request.getHouseholdSize(), request.getIncome());
+
+        user.updateProfile(
+                request.getName(),
+                request.getEmail(),
+                request.getProfileImageUrl(),
+                request.getAge(),
+                request.getGender(),
+                request.getRegion(),
+                request.getDistrict(),
+                request.getMaritalStatus(),
+                request.getEmploymentStatus(),
+                request.getHouseholdSize(),
+                request.getIncome(),
+                autoCalculatedBracket
+        );
     }
 
-    // 비밀번호 변경
     @Transactional
     public void changePassword(Long userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
