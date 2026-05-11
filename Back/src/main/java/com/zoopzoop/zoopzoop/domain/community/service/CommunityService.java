@@ -147,6 +147,7 @@ public class CommunityService {
         return commentRepository.findByPostId(postId).stream()
                 .map(comment -> CommentDto.Response.builder()
                         .id(comment.getId())
+                        .postId(comment.getPostId())
                         .author(comment.getAuthor())
                         .content(comment.getContent())
                         .date(comment.getDate())
@@ -185,7 +186,7 @@ public class CommunityService {
         commentRepository.save(comment);
     }
 
-    // 🚀 [추가됨] 8. 댓글 수정
+    // 8. 댓글 수정
     @Transactional
     public void updateComment(Long commentId, CommentDto.Request request) {
         Comment comment = commentRepository.findById(commentId)
@@ -201,5 +202,43 @@ public class CommunityService {
             throw new IllegalArgumentException("해당 댓글이 존재하지 않습니다. id=" + commentId);
         }
         commentRepository.deleteById(commentId);
+    }
+
+    // ================= 🚀 [추가됨] 마이페이지 기능 ================= //
+
+    // 10. 내가 쓴 게시글 가져오기
+    @Transactional(readOnly = true)
+    public List<PostResponse> getMyPosts(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        return postRepository.findByAuthorOrderByIdDesc(user.getName()).stream()
+                .map(post -> PostResponse.builder()
+                        .id(post.getId())
+                        .type(post.getType())
+                        .category(post.getCategory())
+                        .title(post.getTitle())
+                        .author(post.getAuthor())
+                        .date(post.getDate())
+                        .views(post.getViews())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // 11. 내가 쓴 댓글 가져오기
+    @Transactional(readOnly = true)
+    public List<CommentDto.Response> getMyComments(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        return commentRepository.findByAuthorOrderByIdDesc(user.getName()).stream()
+                .map(comment -> CommentDto.Response.builder()
+                        .id(comment.getId())
+                        .postId(comment.getPostId())
+                        .author(comment.getAuthor())
+                        .content(comment.getContent())
+                        .date(comment.getDate())
+                        .build())
+                .collect(Collectors.toList());
     }
 }
