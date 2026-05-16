@@ -7,20 +7,22 @@ import {
     markAllNotificationsRead,
     markNotificationRead,
 } from '../../api/notifications';
+import { isAuthenticated, getUserName } from '../../api/authSession';
+import { logoutAPI } from '../../api/index';
 
 const Header = () => {
     const navigate = useNavigate();
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
-    const [userName, setUserName] = useState(localStorage.getItem('userName'));
+    const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated());
+    const [userName, setUserName] = useState(getUserName());
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
     useEffect(() => {
         const handleStateChange = () => {
-            const nextLoggedIn = !!localStorage.getItem('accessToken');
+            const nextLoggedIn = isAuthenticated();
             setIsLoggedIn(nextLoggedIn);
-            setUserName(localStorage.getItem('userName'));
+            setUserName(getUserName());
             if (!nextLoggedIn) {
                 setNotifications([]);
                 setUnreadCount(0);
@@ -69,11 +71,14 @@ const Header = () => {
         };
     }, [isLoggedIn]);
 
-    const handleLogout = () => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('userName'); // 로그아웃 시 닉네임도 삭제
-        window.dispatchEvent(new Event('loginStateChange'));
-        navigate('/');
+    const handleLogout = async () => {
+        try {
+            await logoutAPI();
+        } catch (error) {
+            console.error('Logout failed', error);
+        } finally {
+            navigate('/');
+        }
     };
 
     const handleNotificationClick = async (notification) => {

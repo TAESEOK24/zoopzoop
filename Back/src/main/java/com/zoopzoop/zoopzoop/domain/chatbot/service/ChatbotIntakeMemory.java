@@ -25,6 +25,7 @@ public class ChatbotIntakeMemory {
     public static class ChatbotIntakeProfile {
 
         private String concernMessage;
+        private Integer age;
         private String ageGroup;
         private String householdType;
         private String employmentStatus;
@@ -41,6 +42,14 @@ public class ChatbotIntakeMemory {
 
         public String ageGroup() {
             return ageGroup;
+        }
+
+        public Integer age() {
+            return age;
+        }
+
+        public void age(Integer age) {
+            this.age = age;
         }
 
         public void ageGroup(String ageGroup) {

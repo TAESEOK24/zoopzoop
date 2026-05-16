@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import HeroSection from './HeroSection';
 import CategoryGrid from './CategoryGrid';
 import PolicyList from './PolicyList';
+import { isAuthenticated } from '../../api/authSession';
 
 const MainPage = () => {
     const navigate = useNavigate();
     const [showLoginModal, setShowLoginModal] = useState(false);
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
+    const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated());
 
     useEffect(() => {
-        const syncLoginState = () => setIsLoggedIn(!!localStorage.getItem('accessToken'));
+        const syncLoginState = () => setIsLoggedIn(isAuthenticated());
         window.addEventListener('loginStateChange', syncLoginState);
         window.addEventListener('storage', syncLoginState);
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BadgePlus, Bell, ChevronLeft, Clock, Mail, Monitor, Save, Sparkles } from 'lucide-react';
 import { fetchNotificationSettings, updateNotificationSettings } from '../../api/notifications';
+import { getAccessToken } from '../../api/authSession';
 
 const DEFAULT_SETTINGS = {
     deadlineSoon: true,
@@ -19,7 +20,7 @@ const NotificationSettings = () => {
 
     useEffect(() => {
         let cancelled = false;
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert('로그인이 필요합니다.');
             navigate('/login');

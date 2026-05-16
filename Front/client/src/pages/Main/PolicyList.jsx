@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { addPolicyScrap, fetchMyScrapIds, fetchPolicies, migrateLegacyScraps, removePolicyScrap } from '../../api/policies';
 import { fetchPersonalizedRecommendations } from '../../api/recommendations';
+import { clearAuthSession } from '../../api/authSession';
 
 const PolicyList = ({ query, isLoggedIn }) => {
     const [policies, setPolicies] = useState([]);
@@ -89,8 +90,7 @@ const PolicyList = ({ query, isLoggedIn }) => {
                         return;
                     } catch (err) {
                         if (err.response?.status === 401) {
-                            localStorage.removeItem('accessToken');
-                            window.dispatchEvent(new Event('loginStateChange'));
+                            clearAuthSession();
                             setAllowPersonalized(false);
                             await loadDefaultPolicies();
                             return;
