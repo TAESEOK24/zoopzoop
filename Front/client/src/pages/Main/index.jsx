@@ -9,7 +9,6 @@ const MainPage = () => {
     const navigate = useNavigate();
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated());
-    const [query, setQuery] = useState('');
 
     useEffect(() => {
         const syncLoginState = () => setIsLoggedIn(isAuthenticated());
@@ -23,7 +22,12 @@ const MainPage = () => {
     }, []);
 
     const handleSearch = (value) => {
-        setQuery(value);
+        const params = new URLSearchParams({ page: '1' });
+        if (value.trim()) {
+            params.set('query', value.trim());
+        }
+
+        navigate(`/policies?${params.toString()}`);
     };
 
     const handleAiStartClick = () => {
@@ -94,11 +98,11 @@ const MainPage = () => {
                 <section>
                     <div className="mb-6 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-gray-800">
-                            {isLoggedIn && !query.trim() ? '맞춤 추천 정책' : '지금 가장 유용한 정책'}
+                            {isLoggedIn ? '맞춤 추천 정책' : '지금 가장 유용한 정책'}
                         </h2>
                         <button className="font-semibold text-blue-600 hover:underline">전체보기 &gt;</button>
                     </div>
-                    <PolicyList query={query} isLoggedIn={isLoggedIn} />
+                    <PolicyList query="" isLoggedIn={isLoggedIn} />
                 </section>
             </div>
         </div>

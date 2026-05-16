@@ -12,6 +12,7 @@ import com.zoopzoop.zoopzoop.domain.policy.service.MyScrapService;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicyQueryService;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySearchService;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySyncService;
+import com.zoopzoop.zoopzoop.domain.searchlog.dto.RecentSearchesResponse;
 import com.zoopzoop.zoopzoop.domain.searchlog.service.SearchLogService;
 import com.zoopzoop.zoopzoop.global.security.AuthenticatedUser;
 import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
@@ -70,6 +71,14 @@ public class PolicyController {
             @RequestParam(required = false) String special
     ) {
         return ApiResponse.ok(policyQueryService.getPolicyTypeCounts(query, age, region, special));
+    }
+
+    @GetMapping("/recent-searches")
+    public ApiResponse<RecentSearchesResponse> getRecentSearches(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) Integer size
+    ) {
+        return ApiResponse.ok(searchLogService.getRecentSearches(user, size));
     }
 
     @GetMapping("/scraps/me")
