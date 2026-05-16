@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeroSection from './HeroSection';
-import CategoryGrid from './CategoryGrid';
 import PolicyList from './PolicyList';
+import ProfileRecommendationList from './ProfileRecommendationList';
 import { isAuthenticated } from '../../api/authSession';
 
 const MainPage = () => {
@@ -58,7 +58,10 @@ const MainPage = () => {
                         <p className="mb-6 text-sm text-gray-600">
                             회원님의 검색과 조회 이력을 바탕으로 더 적합한 정책을 추천합니다.
                         </p>
-                        <button className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700">
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700"
+                        >
                             로그인하고 추천 보기
                         </button>
                     </div>
@@ -90,17 +93,13 @@ const MainPage = () => {
                     </div>
                 </section>
 
-                <section className="mb-16">
-                    <h2 className="mb-6 text-2xl font-bold text-gray-800">분야별로 둘러보기</h2>
-                    <CategoryGrid />
-                </section>
+                <ProfileRecommendationList isLoggedIn={isLoggedIn} />
 
                 <section>
                     <div className="mb-6 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-gray-800">
                             {isLoggedIn ? '맞춤 추천 정책' : '지금 가장 유용한 정책'}
                         </h2>
-                        <button className="font-semibold text-blue-600 hover:underline">전체보기 &gt;</button>
                     </div>
                     <PolicyList query="" isLoggedIn={isLoggedIn} />
                 </section>
