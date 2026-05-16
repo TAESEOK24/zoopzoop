@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { loginAPI, getGoogleAuthUrlAPI, resetPasswordAPI } from '../../api/auth';
+import { setAuthSession } from '../../api/authSession';
 import { Mail, Lock, ArrowRight, AlertCircle, X } from 'lucide-react';
 
 const LoginPage = () => {
@@ -36,14 +37,10 @@ const LoginPage = () => {
             const token = result?.data?.accessToken || result?.accessToken;
 
             if (token) {
-                localStorage.setItem('accessToken', token);
-
                 // 🚀 [여기가 추가된 부분입니다!]
                 // 백엔드에서 넘겨주는 유저 이름(name)을 찾아서 저장하고, 만약 못 찾으면 로그인한 이메일을 대신 저장합니다.
                 const userName = result?.data?.user?.name || result?.data?.name || formData.email;
-                localStorage.setItem('userName', userName);
-
-                window.dispatchEvent(new Event('loginStateChange')); // 로그인 상태 변경 알림
+                setAuthSession({ accessToken: token, userName });
             } else {
                 console.warn('[LoginPage] 토큰을 응답에서 찾을 수 없습니다.', result);
             }

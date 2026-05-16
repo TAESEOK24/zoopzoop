@@ -15,6 +15,8 @@ import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,9 @@ import org.springframework.stereotype.Service;
 public class ChatbotService {
 
     private static final int SEARCH_SIZE = 3;
+    private static final Pattern AGE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*(?:세|살)");
+    private static final Pattern AGE_CONTEXT_PATTERN = Pattern.compile("(?:나이|연령)\\D{0,8}(\\d{1,3})");
+    private static final Pattern ONLY_NUMBER_PATTERN = Pattern.compile("\\d{1,3}");
 
     private final PolicySearchService policySearchService;
     private final ChatbotAiClient chatbotAiClient;
@@ -123,7 +128,7 @@ public class ChatbotService {
     ) {
         ChatbotIntakeMemory.ChatbotIntakeProfile profile = intakeMemory.getProfile(sessionId);
         String query = buildSearchQuery(message, profile);
-        List<PolicySearchResultDto> policies = policySearchService.searchPolicies(query, SEARCH_SIZE);
+        List<PolicySearchResultDto> policies = policySearchService.searchPolicies(query, SEARCH_SIZE, profile.age());
         List<ChatbotReferenceDto> references = policies.stream()
                 .map(policy -> new ChatbotReferenceDto(
                         policy.serviceId(),
@@ -241,10 +246,16 @@ public class ChatbotService {
     private void mergeProfile(ChatbotIntakeMemory.ChatbotIntakeProfile profile, String rawMessage) {
         String message = rawMessage == null ? "" : rawMessage.trim().toLowerCase();
 
-        if (containsAny(message, "청년", "20대", "30대 초반", "대학생")) {
+        Integer age = extractAge(message, "ageGroup".equals(profile.awaitingField()));
+        if (age != null) {
+            profile.age(age);
+            profile.ageGroup(resolveAgeGroup(age));
+        } else if (containsAny(message, "청년", "20대", "30대 초반", "대학생")) {
             profile.ageGroup("청년");
         } else if (containsAny(message, "중장년", "40대", "50대", "장년")) {
             profile.ageGroup("중장년");
+        } else if (containsAny(message, "노년", "어르신", "고령", "65세 이상", "70대", "80대")) {
+            profile.ageGroup("노년");
         }
 
         if (containsAny(message, "혼자", "1인 가구", "자취")) {
@@ -268,12 +279,62 @@ public class ChatbotService {
         }
     }
 
+    private Integer extractAge(String message, boolean awaitingAgeAnswer) {
+        Integer explicitAge = extractAgeWithPattern(AGE_PATTERN, message);
+        if (explicitAge != null) {
+            return explicitAge;
+        }
+
+        Integer contextualAge = extractAgeWithPattern(AGE_CONTEXT_PATTERN, message);
+        if (contextualAge != null) {
+            return contextualAge;
+        }
+
+        if (awaitingAgeAnswer && ONLY_NUMBER_PATTERN.matcher(message).matches()) {
+            int age = Integer.parseInt(message);
+            return isValidAge(age) ? age : null;
+        }
+
+        return null;
+    }
+
+    private Integer extractAgeWithPattern(Pattern pattern, String message) {
+        Matcher matcher = pattern.matcher(message);
+        while (matcher.find()) {
+            int age = Integer.parseInt(matcher.group(1));
+            if (isValidAge(age)) {
+                return age;
+            }
+        }
+        return null;
+    }
+
+    private boolean isValidAge(int age) {
+        return age > 0 && age <= 120;
+    }
+
+    private String resolveAgeGroup(int age) {
+        if (age < 19) {
+            return "청소년";
+        }
+        if (age <= 39) {
+            return "청년";
+        }
+        if (age <= 64) {
+            return "중장년";
+        }
+        return "노년";
+    }
+
     private String buildSearchQuery(String message, ChatbotIntakeMemory.ChatbotIntakeProfile profile) {
         List<String> tokens = new ArrayList<>();
         tokens.add(message);
 
         if (profile.ageGroup() != null) {
             tokens.add(profile.ageGroup());
+        }
+        if (profile.age() != null) {
+            tokens.add(profile.age() + "세");
         }
         if (profile.householdType() != null) {
             tokens.add(profile.householdType());

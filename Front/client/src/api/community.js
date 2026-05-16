@@ -9,12 +9,7 @@ export const fetchCommunityPosts = (search, page = 0, size = 15) => {
 
 // 2. 새 게시글 작성 (🚀 토큰 필요)
 export const createCommunityPost = async (postData) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.post('/api/community/posts', postData, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    });
+    return axios.post('/api/community/posts', postData);
 };
 
 // 3. 게시글 상세 조회
@@ -22,18 +17,12 @@ export const fetchCommunityPostDetail = (id) => axios.get(`/api/community/posts/
 
 // 4. 게시글 수정 (🚀 토큰 필요)
 export const updateCommunityPost = async (id, postData) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.put(`/api/community/posts/${id}`, postData, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
+    return axios.put(`/api/community/posts/${id}`, postData);
 };
 
 // 5. 게시글 삭제 (🚀 토큰 필요)
 export const deleteCommunityPost = async (id) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.delete(`/api/community/posts/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
+    return axios.delete(`/api/community/posts/${id}`);
 };
 
 // ================= 🚀 댓글 API ================= //
@@ -43,24 +32,15 @@ export const fetchComments = (postId) => axios.get(`/api/community/posts/${postI
 
 // 7. 댓글 작성 (🚀 토큰 필요)
 export const createComment = async (postId, commentData) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.post(`/api/community/posts/${postId}/comments`, commentData, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
+    return axios.post(`/api/community/posts/${postId}/comments`, commentData);
 };
 
 // 8. 댓글 삭제 (🚀 토큰 필요)
 export const deleteComment = async (commentId) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.delete(`/api/community/comments/${commentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
+    return axios.delete(`/api/community/comments/${commentId}`);
 };
 
 // 9. 댓글 수정 (🚀 토큰 필요)
 export const updateComment = async (commentId, data) => {
-    const token = localStorage.getItem('accessToken');
-    return axios.put(`/api/community/comments/${commentId}`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-};
+    return axios.put(`/api/community/comments/${commentId}`, data);
+};

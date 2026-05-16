@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import HeroSection from './HeroSection';
 import PolicyList from './PolicyList';
 import ProfileRecommendationList from './ProfileRecommendationList';
+import { isAuthenticated } from '../../api/authSession';
 
 const MainPage = () => {
     const navigate = useNavigate();
     const [showLoginModal, setShowLoginModal] = useState(false);
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
+    const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated());
 
     useEffect(() => {
-        const syncLoginState = () => setIsLoggedIn(!!localStorage.getItem('accessToken'));
+        const syncLoginState = () => setIsLoggedIn(isAuthenticated());
         window.addEventListener('loginStateChange', syncLoginState);
         window.addEventListener('storage', syncLoginState);
 
@@ -57,7 +58,10 @@ const MainPage = () => {
                         <p className="mb-6 text-sm text-gray-600">
                             회원님의 검색과 조회 이력을 바탕으로 더 적합한 정책을 추천합니다.
                         </p>
-                        <button className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700">
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700"
+                        >
                             로그인하고 추천 보기
                         </button>
                     </div>

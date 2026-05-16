@@ -8,6 +8,7 @@ import {
     deleteComment,
     updateComment // 🚀 댓글 수정 API 추가됨
 } from '../../api/community';
+import { getAccessToken, getUserName } from '../../api/authSession';
 
 const PostDetail = () => {
     const { id } = useParams();
@@ -25,7 +26,7 @@ const PostDetail = () => {
     const [editCommentContent, setEditCommentContent] = useState(''); // 수정 중인 텍스트 내용
 
     // 로컬 스토리지에서 내 이름(명찰) 꺼내기
-    const currentUserName = localStorage.getItem('userName');
+    const currentUserName = getUserName();
 
     useEffect(() => {
         const loadData = async () => {
@@ -64,7 +65,7 @@ const PostDetail = () => {
 
         if (!newComment.trim()) return alert("댓글 내용을 입력해주세요.");
 
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert("로그인 후 댓글을 작성할 수 있습니다.");
             navigate('/login');

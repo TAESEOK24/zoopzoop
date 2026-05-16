@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Settings as SettingsIcon, Shield, ArrowLeft, MapPin, Briefcase } from 'lucide-react';
 import axiosInstance from '../../api/index';
+import { getAccessToken, setAuthSession } from '../../api/authSession';
 
 const Settings = () => {
     const navigate = useNavigate();
@@ -27,7 +28,7 @@ const Settings = () => {
 
     useEffect(() => {
         const fetchUserData = async () => {
-            const token = localStorage.getItem('accessToken');
+            const token = getAccessToken();
             if (!token) { navigate('/login'); return; }
 
             try {
@@ -69,7 +70,7 @@ const Settings = () => {
             }
 
             alert("모든 맞춤 정보가 성공적으로 저장되었습니다.");
-            localStorage.setItem('userName', profileForm.name);
+            setAuthSession({ userName: profileForm.name });
             navigate('/mypage');
         } catch (error) {
             alert(error.response?.data?.message || "수정에 실패했습니다. 입력값을 확인해주세요.");
