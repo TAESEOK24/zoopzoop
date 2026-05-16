@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeroSection from './HeroSection';
-import CategoryGrid from './CategoryGrid';
 import PolicyList from './PolicyList';
+import ProfileRecommendationList from './ProfileRecommendationList';
 
 const MainPage = () => {
     const navigate = useNavigate();
@@ -89,17 +89,13 @@ const MainPage = () => {
                     </div>
                 </section>
 
-                <section className="mb-16">
-                    <h2 className="mb-6 text-2xl font-bold text-gray-800">분야별로 둘러보기</h2>
-                    <CategoryGrid />
-                </section>
+                <ProfileRecommendationList isLoggedIn={isLoggedIn} />
 
                 <section>
                     <div className="mb-6 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-gray-800">
                             {isLoggedIn ? '맞춤 추천 정책' : '지금 가장 유용한 정책'}
                         </h2>
-                        <button className="font-semibold text-blue-600 hover:underline">전체보기 &gt;</button>
                     </div>
                     <PolicyList query="" isLoggedIn={isLoggedIn} />
                 </section>

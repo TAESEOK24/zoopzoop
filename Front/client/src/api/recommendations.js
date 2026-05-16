@@ -22,3 +22,10 @@ export const fetchPersonalizedRecommendations = async (size = 6) => {
     });
     return response.data;
 };
+
+export const fetchProfileBasedRecommendations = async (size = 3) => {
+    const response = await recommendationApi.get('/profile-based', {
+        params: { size },
+    });
+    return response.data;
+};
