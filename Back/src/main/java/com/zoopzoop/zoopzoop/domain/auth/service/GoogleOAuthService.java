@@ -26,6 +26,7 @@ public class GoogleOAuthService {
 
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
     private final RestClient restClient;
     private final String clientId;
@@ -38,6 +39,7 @@ public class GoogleOAuthService {
     public GoogleOAuthService(
             UserRepository userRepository,
             JwtProvider jwtProvider,
+            RefreshTokenService refreshTokenService,
             PasswordEncoder passwordEncoder,
             RestClient.Builder restClientBuilder,
             @Value("${oauth.google.client-id:}") String clientId,
@@ -49,6 +51,7 @@ public class GoogleOAuthService {
     ) {
         this.userRepository = userRepository;
         this.jwtProvider = jwtProvider;
+        this.refreshTokenService = refreshTokenService;
         this.passwordEncoder = passwordEncoder;
         this.restClient = restClientBuilder.build();
         this.clientId = clientId;
@@ -75,7 +78,7 @@ public class GoogleOAuthService {
     }
 
     @Transactional
-    public AuthResponse loginWithCode(String code) {
+    public AuthResult loginWithCode(String code) {
         validateGoogleConfig();
 
         GoogleTokenResponse tokenResponse = requestAccessToken(code);
@@ -89,7 +92,10 @@ public class GoogleOAuthService {
                 .orElseGet(() -> createGoogleUser(userInfo));
         String accessToken = jwtProvider.generateToken(user);
 
-        return AuthResponse.of(accessToken, UserSummary.from(user));
+        return new AuthResult(
+                AuthResponse.of(accessToken, UserSummary.from(user)),
+                refreshTokenService.issue(user)
+        );
     }
 
     private GoogleTokenResponse requestAccessToken(String code) {
