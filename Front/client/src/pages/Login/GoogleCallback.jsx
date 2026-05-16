@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { googleLoginCallbackAPI } from '../../api/auth';
+import { setAuthSession } from '../../api/authSession';
 import { AlertCircle } from 'lucide-react';
 
 const GoogleCallback = () => {
@@ -9,8 +10,13 @@ const GoogleCallback = () => {
     const [error, setError] = useState('');
     const [isProcessing, setIsProcessing] = useState(true);
 
+    const hasProcessed = React.useRef(false);
+
     useEffect(() => {
         const processCallback = async () => {
+            if (hasProcessed.current) return;
+            hasProcessed.current = true;
+
             try {
                 const code = searchParams.get('code');
                 if (!code) {
@@ -24,16 +30,11 @@ const GoogleCallback = () => {
                     throw new Error('인증 토큰을 받아오지 못했습니다.');
                 }
 
-                // 토큰 저장
-                localStorage.setItem('accessToken', token);
-
                 // 유저 정보 저장 (이름 또는 이메일)
                 const user = result?.data?.user;
                 const userName = user?.name || result?.data?.name || user?.email || 'Google User';
-                localStorage.setItem('userName', userName);
 
-                // 로그인 상태 변경 이벤트 발생
-                window.dispatchEvent(new Event('loginStateChange'));
+                setAuthSession({ accessToken: token, userName });
 
                 // 메인 페이지로 이동
                 navigate('/');

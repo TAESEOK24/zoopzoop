@@ -1,22 +1,13 @@
 import axios from 'axios';
-import { API_BASE_URL } from './index';
+import { API_BASE_URL, attachAuthInterceptors } from './index';
 
-const policyApi = axios.create({
+const policyApi = attachAuthInterceptors(axios.create({
     baseURL: `${API_BASE_URL}/api/policies`,
     headers: {
         'Content-Type': 'application/json',
     },
-});
+}));
 
-policyApi.interceptors.request.use((config) => {
-    const token = localStorage.getItem('accessToken');
-
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-});
 
 export const fetchPolicies = async ({
     query = '',
