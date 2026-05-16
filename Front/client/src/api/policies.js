@@ -57,6 +57,13 @@ export const fetchPolicyTypes = async ({ query = '', age = '', region = '', spec
     return response.data;
 };
 
+export const fetchRecentPolicySearches = async (size = 5) => {
+    const response = await policyApi.get('/recent-searches', {
+        params: { size },
+    });
+    return response.data;
+};
+
 export const fetchPolicyDetail = async (serviceId) => {
     const response = await policyApi.get(`/${serviceId}`);
     return response.data;
