@@ -1,10 +1,6 @@
 import axios from './index';
 
 // 1. 게시글 목록 조회 (검색, 페이징, 카테고리 필터링)  [test for api fix]
-// 🚀 category 파라미터를 추가하고 URL을 컨트롤러에 맞게 '/api/community'로 변경합니다. (또는 /posts 유지)
-// 주의: 백엔드 컨트롤러 구조에 따라 주소가 다를 수 있습니다.
-// 위의 CommunityController를 보면 @GetMapping("/posts") 로 되어있으나,
-// 기존에는 axios.get('/api/community/posts', ...) 로 하셨으므로 백엔드와 일치시킵니다.
 export const fetchCommunityPosts = (search = '', page = 0, size = 15, category = '전체글보기') => {
     return axios.get('/api/community/posts', {
         params: { search, page, size, category } // 🚀 category 파라미터 추가
