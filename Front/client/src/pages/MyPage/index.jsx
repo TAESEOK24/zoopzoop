@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronRight, Heart, Mail, User, MessageSquare, Bell, ShieldAlert } from 'lucide-react';
 import axiosInstance from '../../api/index';
 import { fetchMyScraps, migrateLegacyScraps } from '../../api/policies';
+import { getAccessToken, clearAuthSession } from '../../api/authSession';
 
 const MyPage = () => {
     const navigate = useNavigate();
@@ -15,7 +16,7 @@ const MyPage = () => {
 
     useEffect(() => {
         const fetchAllData = async () => {
-            const token = localStorage.getItem('accessToken');
+            const token = getAccessToken();
             if (!token) { navigate('/login'); return; }
 
             try {
@@ -56,9 +57,7 @@ const MyPage = () => {
 
         try {
             await axiosInstance.delete('/api/users/me');
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('userName');
-            window.dispatchEvent(new Event('loginStateChange'));
+            clearAuthSession();
             alert('회원 탈퇴가 완료되었습니다. 그동안 이용해주셔서 감사합니다.');
             navigate('/');
         } catch (error) {

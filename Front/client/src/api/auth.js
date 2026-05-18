@@ -8,6 +8,7 @@ const authApi = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true,
 });
 
 // 로그인 요청

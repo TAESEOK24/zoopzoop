@@ -1,8 +1,11 @@
 package com.zoopzoop.zoopzoop.domain.searchlog.service;
 
+import com.zoopzoop.zoopzoop.domain.searchlog.dto.RecentSearchesResponse;
 import com.zoopzoop.zoopzoop.domain.searchlog.entity.SearchLog;
 import com.zoopzoop.zoopzoop.domain.searchlog.repository.SearchLogRepository;
 import com.zoopzoop.zoopzoop.global.security.AuthenticatedUser;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,6 +17,8 @@ public class SearchLogService {
 
     private static final int MAX_KEYWORD_LENGTH = 255;
     private static final int MAX_SERVICE_ID_LENGTH = 100;
+    private static final int DEFAULT_RECENT_SEARCH_SIZE = 5;
+    private static final int MAX_RECENT_SEARCH_SIZE = 10;
     private static final String ACTION_SEARCH = "SEARCH";
     private static final String ACTION_VIEW = "VIEW";
 
@@ -46,6 +51,31 @@ public class SearchLogService {
         save(user, null, normalizedServiceId, ACTION_VIEW);
     }
 
+    @Transactional(readOnly = true)
+    public RecentSearchesResponse getRecentSearches(AuthenticatedUser user, Integer size) {
+        if (user == null) {
+            return new RecentSearchesResponse(java.util.List.of());
+        }
+
+        int normalizedSize = normalizeRecentSearchSize(size);
+        Set<String> keywords = new LinkedHashSet<>();
+
+        for (SearchLog log : searchLogRepository.findTop30ByUserIdAndActionTypeOrderByActionTimeDesc(
+                Math.toIntExact(user.id()),
+                ACTION_SEARCH
+        )) {
+            String keyword = normalize(log.getKeyword(), MAX_KEYWORD_LENGTH);
+            if (keyword != null) {
+                keywords.add(keyword);
+            }
+            if (keywords.size() >= normalizedSize) {
+                break;
+            }
+        }
+
+        return new RecentSearchesResponse(keywords.stream().toList());
+    }
+
     private void save(AuthenticatedUser user, String keyword, String serviceId, String actionType) {
         searchLogRepository.save(SearchLog.builder()
                 .userId(Math.toIntExact(user.id()))
@@ -69,5 +99,15 @@ public class SearchLogService {
             return trimmed;
         }
         return trimmed.substring(0, maxLength);
+    }
+
+    private int normalizeRecentSearchSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_RECENT_SEARCH_SIZE;
+        }
+        if (size < 1) {
+            return DEFAULT_RECENT_SEARCH_SIZE;
+        }
+        return Math.min(size, MAX_RECENT_SEARCH_SIZE);
     }
 }
