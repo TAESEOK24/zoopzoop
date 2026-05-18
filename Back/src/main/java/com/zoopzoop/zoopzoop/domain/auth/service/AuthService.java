@@ -26,21 +26,24 @@ public class AuthService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final JwtProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     public AuthService(
             JwtProvider jwtProvider,
+            RefreshTokenService refreshTokenService,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder
     ) {
         this.jwtProvider = jwtProvider;
+        this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
-    public AuthResponse signup(SignupRequest request) {
+    public AuthResult signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new AppException(409, "Email is already registered.");
         }
@@ -55,11 +58,14 @@ public class AuthService {
         User savedUser = userRepository.save(user);
         String accessToken = jwtProvider.generateToken(savedUser);
 
-        return AuthResponse.of(accessToken, UserSummary.from(savedUser));
+        return new AuthResult(
+                AuthResponse.of(accessToken, UserSummary.from(savedUser)),
+                refreshTokenService.issue(savedUser)
+        );
     }
 
-    @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
+    @Transactional
+    public AuthResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new AppException(401, "Invalid email or password."));
 
@@ -69,7 +75,26 @@ public class AuthService {
 
         String accessToken = jwtProvider.generateToken(user);
 
-        return AuthResponse.of(accessToken, UserSummary.from(user));
+        return new AuthResult(
+                AuthResponse.of(accessToken, UserSummary.from(user)),
+                refreshTokenService.issue(user)
+        );
+    }
+
+    @Transactional
+    public AuthResult refresh(String refreshToken) {
+        User user = refreshTokenService.getUserFromUsableToken(refreshToken);
+        String accessToken = jwtProvider.generateToken(user);
+
+        return new AuthResult(
+                AuthResponse.of(accessToken, UserSummary.from(user)),
+                refreshTokenService.rotate(refreshToken)
+        );
+    }
+
+    @Transactional
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
     }
 
     @Transactional

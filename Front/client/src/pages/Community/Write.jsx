@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createCommunityPost } from '../../api/community';
+import { getAccessToken, getUserName } from '../../api/authSession';
 
 const CommunityWrite = () => {
     const navigate = useNavigate();
@@ -16,7 +17,7 @@ const CommunityWrite = () => {
         e.preventDefault();
 
         // 🚀 [핵심 추가 1] 로그인(토큰) 여부 검사 방어막!
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert('로그인 후 글을 작성할 수 있습니다.');
             navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로 쫓아냄
@@ -33,7 +34,7 @@ const CommunityWrite = () => {
             setLoading(true);
 
             // 🚀 [핵심 추가 2] '테스트유저' 대신 진짜 로그인한 내 명찰(이름) 가져오기
-            const currentUserName = localStorage.getItem('userName') || '익명';
+            const currentUserName = getUserName() || '익명';
 
             // 백엔드로 보낼 데이터 객체 조립
             const postData = {

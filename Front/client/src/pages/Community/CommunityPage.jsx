@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchCommunityPosts } from '../../api/community';
 import { fetchPolicies } from '../../api/policies';
+import { getAccessToken } from '../../api/authSession';
 
 const CommunityPage = () => {
     const navigate = useNavigate();
@@ -83,7 +84,7 @@ const CommunityPage = () => {
 
     // 🚀 [핵심 추가] 글쓰기 버튼 클릭 시 로그인 여부 검사
     const handleWriteClick = () => {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert("로그인 후 이용할 수 있습니다.");
             navigate('/login');

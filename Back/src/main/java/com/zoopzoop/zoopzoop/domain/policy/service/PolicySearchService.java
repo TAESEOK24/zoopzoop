@@ -33,11 +33,16 @@ public class PolicySearchService {
     private final PolicyDetailRepository policyDetailRepository;
 
     public List<PolicySearchResultDto> searchPolicies(String keyword, Integer size) {
+        return searchPolicies(keyword, size, null);
+    }
+
+    public List<PolicySearchResultDto> searchPolicies(String keyword, Integer size, Integer age) {
         String normalizedKeyword = normalizeKeyword(keyword);
         int normalizedSize = normalizeSize(size);
 
-        List<PolicyList> directMatches = policyListRepository.searchByKeyword(
+        List<PolicyList> directMatches = searchByKeyword(
                 normalizedKeyword,
+                age,
                 PageRequest.of(0, normalizedSize)
         );
 
@@ -47,7 +52,7 @@ public class PolicySearchService {
                     .toList();
         }
 
-        return searchByKeywordTokens(normalizedKeyword, normalizedSize).stream()
+        return searchByKeywordTokens(normalizedKeyword, normalizedSize, age).stream()
                 .map(this::toSearchResultDto)
                 .toList();
     }
@@ -83,7 +88,7 @@ public class PolicySearchService {
         return Math.min(size, MAX_SIZE);
     }
 
-    private List<PolicyList> searchByKeywordTokens(String keyword, int size) {
+    private List<PolicyList> searchByKeywordTokens(String keyword, int size, Integer age) {
         List<String> tokens = extractSearchTokens(keyword);
         if (tokens.isEmpty()) {
             return List.of();
@@ -91,7 +96,7 @@ public class PolicySearchService {
 
         Map<String, PolicyList> deduplicated = new LinkedHashMap<>();
         for (String token : tokens) {
-            List<PolicyList> matches = policyListRepository.searchByKeyword(token, PageRequest.of(0, size));
+            List<PolicyList> matches = searchByKeyword(token, age, PageRequest.of(0, size));
             for (PolicyList policy : matches) {
                 deduplicated.putIfAbsent(policy.getServiceId(), policy);
                 if (deduplicated.size() >= size) {
@@ -101,6 +106,14 @@ public class PolicySearchService {
         }
 
         return deduplicated.values().stream().toList();
+    }
+
+    private List<PolicyList> searchByKeyword(String keyword, Integer age, PageRequest pageRequest) {
+        if (age == null) {
+            return policyListRepository.searchByKeyword(keyword, pageRequest);
+        }
+
+        return policyListRepository.searchByKeywordAndAge(keyword, age, pageRequest);
     }
 
     private List<String> extractSearchTokens(String keyword) {
