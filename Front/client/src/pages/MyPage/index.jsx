@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronRight, Heart, Mail, User, MessageSquare, Bell } from 'lucide-react';
+import { Calendar, ChevronRight, Heart, Mail, User, MessageSquare, Bell, ShieldAlert } from 'lucide-react';
 import axiosInstance from '../../api/index';
 import { fetchMyScraps, migrateLegacyScraps } from '../../api/policies';
 import { getAccessToken, clearAuthSession } from '../../api/authSession';
@@ -42,14 +42,27 @@ const MyPage = () => {
         fetchAllData();
     }, [navigate]);
 
+    // 🚀 안전한 회원 탈퇴 로직 (특정 문구 입력)
     const handleDeleteAccount = async () => {
-        if (!window.confirm('정말로 탈퇴하시겠습니까? 탈퇴 시 모든 정보가 삭제되며 복구할 수 없습니다.')) return;
+        const confirmText = window.prompt('정말로 탈퇴하시겠습니까?\n탈퇴를 원하시면 "탈퇴동의" 라고 입력해주세요.');
+
+        // 취소를 누르거나 빈 칸인 경우 방어
+        if (confirmText === null) return;
+
+        // 정확한 텍스트를 입력하지 않은 경우
+        if (confirmText !== '탈퇴동의') {
+            alert('입력한 문구가 일치하지 않습니다. 탈퇴가 취소되었습니다.');
+            return;
+        }
+
         try {
             await axiosInstance.delete('/api/users/me');
             clearAuthSession();
             alert('회원 탈퇴가 완료되었습니다. 그동안 이용해주셔서 감사합니다.');
             navigate('/');
-        } catch (error) { alert('탈퇴 실패'); }
+        } catch (error) {
+            alert('탈퇴 처리에 실패했습니다.');
+        }
     };
 
     if (loading) return <div className="flex min-h-screen items-center justify-center bg-gray-50"><span className="text-xl font-bold text-blue-500">정보를 불러오는 중입니다...</span></div>;
@@ -95,7 +108,18 @@ const MyPage = () => {
                             <div className="space-y-1">
                                 <MenuButton label="내 정보 관리" onClick={() => navigate('/mypage/settings')} />
                                 <MenuButton label="알림 설정" onClick={() => navigate('/mypage/notifications')} />
-                                {/* 🚀 회원 탈퇴 버튼을 좌측 메뉴 안으로 다시 이동! */}
+
+                                {/* 🚀 ADMIN 권한일 때만 보이는 관리자 메뉴 (알림 설정 바로 아래) */}
+                                {userInfo.role === 'ADMIN' && (
+                                    <MenuButton
+                                        label="👑 관리자 대시보드"
+                                        onClick={() => navigate('/admin')}
+                                        className="bg-indigo-50 border border-indigo-100 mt-2"
+                                        labelClassName="text-indigo-700 group-hover:text-indigo-800"
+                                        iconClassName="text-indigo-400 group-hover:text-indigo-600"
+                                    />
+                                )}
+
                                 <button onClick={handleDeleteAccount} className="w-full text-left p-4 mt-2 text-sm font-bold text-red-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-colors">
                                     회원 탈퇴하기
                                 </button>
@@ -167,10 +191,11 @@ const TabButton = ({ active, onClick, icon, label }) => (
     </button>
 );
 
-const MenuButton = ({ label, onClick }) => (
-    <button onClick={onClick} className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-gray-50 transition-colors group">
-        <span className="text-gray-600 text-sm font-bold group-hover:text-blue-600">{label}</span>
-        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+// 🚀 MenuButton을 조금 더 유연하게 업데이트하여 커스텀 스타일(관리자용)을 받을 수 있게 변경
+const MenuButton = ({ label, onClick, className = '', labelClassName = 'text-gray-600', iconClassName = 'text-gray-300' }) => (
+    <button onClick={onClick} className={`w-full flex items-center justify-between p-4 rounded-2xl hover:bg-gray-50 transition-colors group ${className}`}>
+        <span className={`text-sm font-bold group-hover:text-blue-600 transition-colors ${labelClassName}`}>{label}</span>
+        <ChevronRight className={`w-4 h-4 group-hover:translate-x-1 group-hover:text-blue-500 transition-all ${iconClassName}`} />
     </button>
 );
 

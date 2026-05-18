@@ -29,15 +29,21 @@ public class CommunityService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
 
-    // 1. 게시글 목록 조회
-    public Map<String, Object> getPosts(String keyword, int page, int size) {
+    // 1. 게시글 목록 조회 (🚀 type 필터링 로직 추가!)
+    public Map<String, Object> getPosts(String category, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
-
         Page<Post> postPage;
-        if (keyword != null && !keyword.isEmpty()) {
-            postPage = postRepository.findByTitleContainingIgnoreCase(keyword, pageable);
+
+        boolean isAll = (category == null || category.trim().isEmpty() || category.equals("전체") || category.equals("전체글보기"));
+        boolean isBest = category.equals("베스트 게시물 (HOT)");
+        boolean hasKeyword = (keyword != null && !keyword.trim().isEmpty());
+
+        if (isAll) {
+            postPage = hasKeyword ? postRepository.findByTitleContainingIgnoreCase(keyword, pageable) : postRepository.findAll(pageable);
+        } else if (isBest) {
+            postPage = hasKeyword ? postRepository.findByViewsGreaterThanEqualAndTitleContainingIgnoreCase(10L, keyword, pageable) : postRepository.findByViewsGreaterThanEqual(10L, pageable);
         } else {
-            postPage = postRepository.findAll(pageable);
+            postPage = hasKeyword ? postRepository.findByCategoryAndTitleContainingIgnoreCase(category, keyword, pageable) : postRepository.findByCategory(category, pageable);
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -142,7 +148,6 @@ public class CommunityService {
 
     // ================= 댓글 기능 ================= //
 
-    // 6. 댓글 목록 조회
     public List<CommentDto.Response> getComments(Long postId) {
         return commentRepository.findByPostId(postId).stream()
                 .map(comment -> CommentDto.Response.builder()
@@ -155,7 +160,6 @@ public class CommunityService {
                 .collect(Collectors.toList());
     }
 
-    // 7. 댓글 작성
     @Transactional
     public void addComment(Long postId, CommentDto.Request request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -186,16 +190,13 @@ public class CommunityService {
         commentRepository.save(comment);
     }
 
-    // 8. 댓글 수정
     @Transactional
     public void updateComment(Long commentId, CommentDto.Request request) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 댓글이 존재하지 않습니다. id=" + commentId));
-
         comment.updateContent(request.getContent());
     }
 
-    // 9. 댓글 삭제
     @Transactional
     public void deleteComment(Long commentId) {
         if (!commentRepository.existsById(commentId)) {
@@ -204,9 +205,8 @@ public class CommunityService {
         commentRepository.deleteById(commentId);
     }
 
-    // ================= 🚀 [추가됨] 마이페이지 기능 ================= //
+    // ================= 마이페이지 기능 ================= //
 
-    // 10. 내가 쓴 게시글 가져오기
     @Transactional(readOnly = true)
     public List<PostResponse> getMyPosts(Long userId) {
         User user = userRepository.findById(userId)
@@ -225,7 +225,6 @@ public class CommunityService {
                 .collect(Collectors.toList());
     }
 
-    // 11. 내가 쓴 댓글 가져오기
     @Transactional(readOnly = true)
     public List<CommentDto.Response> getMyComments(Long userId) {
         User user = userRepository.findById(userId)

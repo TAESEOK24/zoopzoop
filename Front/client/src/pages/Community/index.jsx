@@ -9,7 +9,7 @@ const CommunityPage = () => {
     // --- 상태(State) 관리 ---
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeCategory, setActiveCategory] = useState('전체글보기'); // 현재 선택된 카테고리
+    const [activeCategory, setActiveCategory] = useState('전체글보기');
     const [searchInput, setSearchInput] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -23,24 +23,20 @@ const CommunityPage = () => {
             try {
                 setLoading(true);
 
-                // 🚀 카테고리, 검색어, 페이지, 개수를 모두 고려하여 호출
-                // (참고: 백엔드에서 카테고리 필터링도 처리해주면 더 완벽합니다!)
-                const [communityRes, policyRes] = await Promise.all([
-                    fetchCommunityPosts(searchTerm, currentPage - 1, itemsPerPage),
+                // 🚀 백엔드로 activeCategory(현재 탭 이름)를 같이 던져줍니다!
+                const [communityResult, policyResult] = await Promise.allSettled([
+                    fetchCommunityPosts(searchTerm, currentPage - 1, itemsPerPage, activeCategory),
                     fetchPolicies()
                 ]);
 
-                let combinedData = [];
+                let finalPosts = [];
 
-                if (communityRes.data && communityRes.data.data) {
-                    const result = communityRes.data.data;
-                    setTotalPages(result.totalPages || 1);
-                    combinedData = [...(result.posts || [])];
-                }
-
-                const policyList = policyRes?.data?.items || policyRes?.data?.content || policyRes?.data || [];
-                if (Array.isArray(policyList)) {
-                    const formattedPolicies = policyList.map(p => ({
+                // 1. 공공데이터 정책 처리
+                let formattedPolicies = [];
+                if (policyResult.status === 'fulfilled' && policyResult.value?.data) {
+                    const resData = policyResult.value.data;
+                    const policyList = resData.items || resData.content || (Array.isArray(resData) ? resData : []);
+                    formattedPolicies = policyList.map(p => ({
                         id: `policy-${p.serviceId || p.id}`,
                         policyServiceId: p.serviceId,
                         type: '정책',
@@ -50,21 +46,21 @@ const CommunityPage = () => {
                         date: p.applicationDeadline || p.startDate || '-',
                         views: p.viewCount || p.views || 0
                     }));
-
-                    // 공지사항 카테고리일 때나 전체보기일 때만 정책 데이터 포함
-                    if (activeCategory === '전체글보기' || activeCategory === '공지사항') {
-                        combinedData = [...combinedData, ...formattedPolicies];
-                    }
                 }
 
-                // 🚀 프론트엔드에서 한 번 더 카테고리 필터링 (백엔드 미구현 대비)
-                if (activeCategory !== '전체글보기' && activeCategory !== '베스트 게시물 (HOT)' && activeCategory !== '공지사항') {
-                    combinedData = combinedData.filter(post => post.category === activeCategory);
-                } else if (activeCategory === '베스트 게시물 (HOT)') {
-                    combinedData = combinedData.filter(post => (post.views || 0) >= 10); // 테스트용 기준
+                // '공지사항'이나 '전체글보기' 탭일 때만 정책 데이터를 위쪽에 합칩니다.
+                if (activeCategory === '전체글보기' || activeCategory === '공지사항') {
+                    finalPosts = [...formattedPolicies];
                 }
 
-                setPosts(combinedData);
+                // 2. 커뮤니티 데이터 처리 (백엔드가 이미 탭에 맞게 필터링해서 줍니다!)
+                if (communityResult.status === 'fulfilled' && communityResult.value?.data?.data) {
+                    const result = communityResult.value.data.data;
+                    setTotalPages(result.totalPages || 1);
+                    finalPosts = [...finalPosts, ...(result.posts || [])];
+                }
+
+                setPosts(finalPosts);
 
             } catch (error) {
                 console.error("데이터 로드 실패:", error);
@@ -75,12 +71,12 @@ const CommunityPage = () => {
         };
 
         fetchData();
-    }, [currentPage, searchTerm, itemsPerPage, activeCategory]); // 🚀 카테고리가 바뀌어도 다시 불러옴!
+    }, [currentPage, searchTerm, itemsPerPage, activeCategory]);
 
     // --- 핸들러 함수들 ---
     const handleCategoryClick = (category) => {
         setActiveCategory(category);
-        setCurrentPage(1); // 카테고리 바꾸면 1페이지로!
+        setCurrentPage(1);
     };
 
     const handleSearch = () => {
@@ -88,7 +84,6 @@ const CommunityPage = () => {
         setCurrentPage(1);
     };
 
-    // 왼쪽 메뉴 아이템 렌더링 함수 (복구 완료!)
     const renderMenuItem = (name, icon = null) => {
         const isActive = activeCategory === name;
         return (
@@ -111,7 +106,7 @@ const CommunityPage = () => {
         <div className="min-h-screen bg-gray-50 py-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row gap-8">
 
-                {/* 🚀 좌측 사이드바 (완전 복구) */}
+                {/* 좌측 사이드바 */}
                 <aside className="w-full md:w-64 flex-shrink-0 space-y-6">
                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
                         <div className="flex items-center space-x-3 mb-4">
@@ -166,7 +161,6 @@ const CommunityPage = () => {
                     <div className="flex justify-between items-center border-b pb-4 mb-4">
                         <h2 className="text-xl font-bold text-gray-900">{activeCategory}</h2>
 
-                        {/* 🚀 개수 선택 Select */}
                         <select
                             className="border border-gray-300 text-sm rounded-md px-2 py-1 outline-none cursor-pointer bg-white"
                             value={itemsPerPage}
@@ -203,7 +197,8 @@ const CommunityPage = () => {
                                     <tr key={post.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(post.policyServiceId ? `/policies/${post.policyServiceId}` : `/community/post/${post.id}`)}>
                                         <td className="py-4 px-4 text-center">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                                                    post.type === '정책' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'
+                                                    post.type === '정책' ? 'bg-blue-50 text-blue-600' :
+                                                        post.category === '공지사항' ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600'
                                                 }`}>
                                                     {post.category || '일반'}
                                                 </span>
