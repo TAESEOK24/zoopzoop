@@ -1,6 +1,7 @@
 package com.zoopzoop.zoopzoop.domain.chatbot.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -68,7 +69,7 @@ class ChatbotServiceTest {
         when(conversationMemory.resolveSessionId(null)).thenReturn("session-1");
         when(conversationMemory.getRecentMessages("session-1"))
                 .thenReturn(List.of(new ChatbotConversationMessage("assistant", "안녕하세요")));
-        when(policySearchService.searchPolicies("청년 주거 지원 알려줘", 3)).thenReturn(policies);
+        when(policySearchService.searchPolicies("청년 주거 지원 알려줘", 3, null)).thenReturn(policies);
         when(chatbotAiClient.generateAnswer(
                 "청년 주거 지원 알려줘",
                 List.of(new ChatbotConversationMessage("assistant", "안녕하세요")),
@@ -139,7 +140,7 @@ class ChatbotServiceTest {
 
         when(conversationMemory.resolveSessionId("session-job")).thenReturn("session-job");
         when(conversationMemory.getRecentMessages("session-job")).thenReturn(List.of());
-        when(policySearchService.searchPolicies("구직 중인데 받을 수 있는 지원 정책 있어?", 3)).thenReturn(policies);
+        when(policySearchService.searchPolicies("구직 중인데 받을 수 있는 지원 정책 있어?", 3, null)).thenReturn(policies);
         when(chatbotAiClient.generateAnswer("구직 중인데 받을 수 있는 지원 정책 있어?", List.of(), policies))
                 .thenReturn(new ChatbotAiResult("구직 지원 정책을 찾았어요.", List.of()));
 
@@ -183,7 +184,7 @@ class ChatbotServiceTest {
 
         when(conversationMemory.resolveSessionId("session-3")).thenReturn("session-3");
         when(conversationMemory.getRecentMessages("session-3")).thenReturn(List.of());
-        when(policySearchService.searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3)).thenReturn(policies);
+        when(policySearchService.searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3, null)).thenReturn(policies);
         when(chatbotAiClient.generateAnswer("나는 너무 가난한 것 같아", List.of(), policies))
                 .thenReturn(new ChatbotAiResult(
                         "청년 1인 가구에 맞는 지원 정책을 찾았어요.",
@@ -198,7 +199,45 @@ class ChatbotServiceTest {
         assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, secondResponse.responseType());
         assertEquals(ChatbotResponseType.POLICY_SEARCH, thirdResponse.responseType());
         assertEquals(1, thirdResponse.matchedPolicyCount());
-        verify(policySearchService).searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3);
+        verify(policySearchService).searchPolicies("나는 너무 가난한 것 같아 청년 1인 가구", 3, null);
+    }
+
+    @Test
+    void askTreatsNumericAgeAsAgeGroupDuringClarification() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-1",
+                        "Youth One-Person Housing Support",
+                        "Supports one-person young households.",
+                        "Young single-person households",
+                        "Monthly rent support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-1",
+                        "Seoul",
+                        "Youth Policy Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-age")).thenReturn("session-age");
+        when(conversationMemory.getRecentMessages("session-age")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("나는 너무 가난한 것 같아 청년 25세 1인 가구", 3, 25)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("나는 너무 가난한 것 같아", List.of(), policies))
+                .thenReturn(new ChatbotAiResult(
+                        "청년 1인 가구에 맞는 지원 정책을 찾았어요.",
+                        List.of(new ChatbotRecommendationDto("svc-1", "청년 1인 가구의 주거 부담과 연결됩니다."))
+                ));
+
+        ChatbotAskResponse firstResponse = chatbotService.ask("session-age", "나는 너무 가난한 것 같아");
+        ChatbotAskResponse secondResponse = chatbotService.ask("session-age", "25살이에요");
+        ChatbotAskResponse thirdResponse = chatbotService.ask("session-age", "혼자 살아요");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, firstResponse.responseType());
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, secondResponse.responseType());
+        assertFalse(secondResponse.answer().contains("연령대"));
+        assertTrue(secondResponse.answer().contains("혼자"));
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, thirdResponse.responseType());
+        verify(policySearchService).searchPolicies("나는 너무 가난한 것 같아 청년 25세 1인 가구", 3, 25);
     }
 
     @Test
@@ -225,3 +264,4 @@ class ChatbotServiceTest {
         verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
     }
 }
+

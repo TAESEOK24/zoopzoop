@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, RefreshCcw, Search, Star, X } from 'lucide-react';
 import { addPolicyScrap, fetchMyScrapIds, fetchPolicies, fetchPolicyTypes, migrateLegacyScraps, removePolicyScrap } from '../../api/policies';
+import { getAccessToken } from '../../api/authSession';
 
 const PAGE_SIZE = 24;
 const sortOptions = [
@@ -251,7 +252,7 @@ const PolicyPage = () => {
 
     useEffect(() => {
         let cancelled = false;
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
 
         if (!token) {
             setLikedPolicyIds([]);
@@ -387,7 +388,7 @@ const PolicyPage = () => {
     };
 
     const togglePolicyLike = async (serviceId) => {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert('로그인이 필요합니다.');
             return;

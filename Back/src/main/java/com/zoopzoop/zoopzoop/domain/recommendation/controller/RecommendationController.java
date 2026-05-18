@@ -1,5 +1,6 @@
 package com.zoopzoop.zoopzoop.domain.recommendation.controller;
 
+import com.zoopzoop.zoopzoop.domain.recommendation.dto.ProfileRecommendationResponse;
 import com.zoopzoop.zoopzoop.domain.recommendation.dto.RecommendationResponse;
 import com.zoopzoop.zoopzoop.domain.recommendation.service.RecommendationService;
 import com.zoopzoop.zoopzoop.global.security.AuthenticatedUser;
@@ -32,5 +33,13 @@ public class RecommendationController {
             @RequestParam(required = false) Integer size
     ) {
         return ApiResponse.ok(recommendationService.getPersonalizedRecommendations(user, size));
+    }
+
+    @GetMapping("/profile-based")
+    public ApiResponse<ProfileRecommendationResponse> getProfileBasedRecommendations(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) Integer size
+    ) {
+        return ApiResponse.ok(recommendationService.getProfileBasedRecommendations(user, size));
     }
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Search, Star, Trash2 } from 'lucide-react';
 import { fetchMyScraps, migrateLegacyScraps, removePolicyScrap } from '../../api/policies';
+import { getAccessToken } from '../../api/authSession';
 
 const PAGE_SIZE = 12;
 
@@ -40,7 +41,7 @@ const ScrapsPage = () => {
 
     useEffect(() => {
         let cancelled = false;
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
 
         if (!token) {
             alert('로그인이 필요합니다.');

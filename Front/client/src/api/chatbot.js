@@ -1,20 +1,13 @@
 import axios from 'axios';
-import { API_BASE_URL } from './index';
+import { API_BASE_URL, attachAuthInterceptors } from './index';
 
-const chatbotApi = axios.create({
+const chatbotApi = attachAuthInterceptors(axios.create({
     baseURL: `${API_BASE_URL}/api/chatbot`,
     headers: {
         'Content-Type': 'application/json',
     },
-});
+}));
 
-chatbotApi.interceptors.request.use((config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
 
 /**
  * @typedef {Object} AskChatbotParams
