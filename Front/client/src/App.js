@@ -18,6 +18,9 @@ import NotificationSettings from './pages/MyPage/NotificationSettings';
 import ScrapsPage from './pages/MyPage/Scraps';
 import MyPageSettings from './pages/MyPage/Settings';
 
+// 🚀 1. 어드민 페이지 임포트 추가!
+import AdminPage from './pages/Admin';
+
 function App() {
     return (
         <Router>
@@ -38,9 +41,13 @@ function App() {
                         <Route path="/policies/:serviceId" element={<PolicyDetail />} />
                         <Route path="/policy/:serviceId" element={<PolicyDetail />} />
                         <Route path="/mypage" element={<MyPage />} />
-                        <Route path="/mypage/settings" element={<MyPageSettings />} />  {/* 🚀 여기 추가! */}
+                        <Route path="/mypage/settings" element={<MyPageSettings />} />
                         <Route path="/mypage/notifications" element={<NotificationSettings />} />
                         <Route path="/mypage/scraps" element={<ScrapsPage />} />
+
+                        {/* 🚀 2. 어드민 라우터 추가! */}
+                        <Route path="/admin" element={<AdminPage />} />
+
                     </Routes>
                 </main>
                 <Footer />

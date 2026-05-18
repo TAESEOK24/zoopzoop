@@ -22,12 +22,14 @@ public class CommunityController {
     // 1. 게시글 목록 조회 (검색어 + 페이징)
     @GetMapping("/posts")
     public ApiResponse<Map<String, Object>> getPosts(
+            @RequestParam(required = false, defaultValue = "전체글보기") String category, // 🚀 이 부분이 필요합니다!
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
-        return ApiResponse.ok(communityService.getPosts(search, page, size));
-    }
 
+        // 주의: CommunityService.getPosts 도 이 4개의 인자를 받도록 수정되어 있어야 합니다.
+        return ApiResponse.ok(communityService.getPosts(category, search, page, size));
+    }
     // 2. 게시글 상세 조회
     @GetMapping("/posts/{id}")
     public ApiResponse<PostResponse> getPost(@PathVariable Long id) {
