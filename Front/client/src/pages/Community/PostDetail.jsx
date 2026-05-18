@@ -1,42 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    fetchCommunityPostDetail,
-    deleteCommunityPost,
-    fetchComments,
-    createComment,
-    deleteComment,
-    updateComment // 🚀 댓글 수정 API 추가됨
-} from '../../api/community';
+import { fetchCommunityPostDetail, deleteCommunityPost, fetchComments, createComment, deleteComment } from '../../api/community';
+import axiosInstance from '../../api/index';
+import { User, Clock, Eye, MessageSquare, AlertTriangle } from 'lucide-react';
 
 const PostDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
 
+    // 상태 관리
     const [post, setPost] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    // 댓글 관련 상태 관리
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
+    const [currentUser, setCurrentUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // 🚀 댓글 수정 모드 관련 상태 관리
-    const [editingCommentId, setEditingCommentId] = useState(null); // 수정 중인 댓글의 ID
-    const [editCommentContent, setEditCommentContent] = useState(''); // 수정 중인 텍스트 내용
-
-    // 로컬 스토리지에서 내 이름(명찰) 꺼내기
-    const currentUserName = localStorage.getItem('userName');
+    // 신고 모달 상태
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportTarget, setReportTarget] = useState({ type: '', id: null });
+    const [reportReason, setReportReason] = useState('');
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const postResponse = await fetchCommunityPostDetail(id);
-                setPost(postResponse.data.data);
+                // 1. 내 정보 가져오기 (관리자 확인용)
+                const token = localStorage.getItem('accessToken');
+                if (token) {
+                    const userRes = await axiosInstance.get('/api/users/me');
+                    setCurrentUser(userRes.data.data);
+                }
 
-                const commentResponse = await fetchComments(id);
-                setComments(commentResponse.data.data);
+                // 2. 게시글 & 댓글 가져오기
+                const postRes = await fetchCommunityPostDetail(id);
+                setPost(postRes.data.data || postRes.data);
+
+                const commentsRes = await fetchComments(id);
+                setComments(commentsRes.data.data || []);
             } catch (error) {
-                alert("게시글을 불러올 수 없습니다.");
+                alert('게시글을 불러올 수 없습니다.');
                 navigate('/community');
             } finally {
                 setLoading(false);
@@ -45,213 +46,201 @@ const PostDetail = () => {
         loadData();
     }, [id, navigate]);
 
-    // 게시글 삭제
+    // 🚀 [핵심] 관리자인지 확인하는 변수
+    const isAdmin = currentUser?.role === 'ADMIN';
+
+    // 게시글 삭제 (작성자 또는 관리자)
     const handleDeletePost = async () => {
-        if (window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) {
-            try {
-                await deleteCommunityPost(id);
-                alert("삭제되었습니다.");
-                navigate('/community');
-            } catch (error) {
-                alert("게시글 삭제 중 오류가 발생했습니다.");
-            }
-        }
+        if (!window.confirm('정말 이 게시글을 삭제하시겠습니까?')) return;
+        try {
+            await deleteCommunityPost(id);
+            alert('삭제되었습니다.');
+            navigate('/community');
+        } catch (error) { alert('삭제에 실패했습니다.'); }
     };
 
-    // 새 댓글 등록
+    // 댓글 작성
     const handleAddComment = async (e) => {
         e.preventDefault();
-
-        if (!newComment.trim()) return alert("댓글 내용을 입력해주세요.");
-
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-            alert("로그인 후 댓글을 작성할 수 있습니다.");
-            navigate('/login');
-            return;
-        }
-
+        if (!newComment.trim()) return;
         try {
             await createComment(id, { content: newComment });
-            setNewComment(''); // 입력창 비우기
-
-            // 등록 후 댓글 목록 새로고침
-            const commentResponse = await fetchComments(id);
-            setComments(commentResponse.data.data);
-        } catch (error) {
-            alert("댓글 등록에 실패했습니다.");
-        }
+            setNewComment('');
+            const commentsRes = await fetchComments(id);
+            setComments(commentsRes.data.data || []);
+        } catch (error) { alert('댓글 작성에 실패했습니다.'); }
     };
 
-    // 댓글 삭제
+    // 댓글 삭제 (작성자 또는 관리자)
     const handleDeleteComment = async (commentId) => {
-        if (window.confirm("댓글을 삭제하시겠습니까?")) {
-            try {
-                await deleteComment(commentId);
-                // 삭제 후 댓글 목록 새로고침
-                const commentResponse = await fetchComments(id);
-                setComments(commentResponse.data.data);
-            } catch (error) {
-                alert("댓글 삭제에 실패했습니다.");
-            }
-        }
-    };
-
-    // 🚀 수정 버튼을 눌렀을 때 작동
-    const handleEditClick = (comment) => {
-        setEditingCommentId(comment.id); // 현재 댓글을 '수정 모드'로 변경
-        setEditCommentContent(comment.content); // 기존 내용을 입력창에 세팅
-    };
-
-    // 🚀 수정 취소
-    const handleCancelEdit = () => {
-        setEditingCommentId(null); // 수정 모드 해제
-        setEditCommentContent('');
-    };
-
-    // 🚀 수정 완료(저장) 백엔드 전송
-    const handleUpdateComment = async (commentId) => {
-        if (!editCommentContent.trim()) return alert("수정할 내용을 입력해주세요.");
-
+        if (!window.confirm('이 댓글을 삭제하시겠습니까?')) return;
         try {
-            await updateComment(commentId, { content: editCommentContent });
-            alert("댓글이 수정되었습니다.");
+            await deleteComment(commentId);
+            setComments(comments.filter(c => c.id !== commentId));
+        } catch (error) { alert('삭제 실패!'); }
+    };
 
-            setEditingCommentId(null); // 수정 모드 해제
+    // 🚨 신고하기 모달 열기
+    const openReportModal = (type, targetId) => {
+        if (!currentUser) {
+            alert('로그인 후 이용 가능합니다.');
+            return;
+        }
+        setReportTarget({ type, id: targetId });
+        setIsReportModalOpen(true);
+    };
 
-            // 수정 후 댓글 목록 새로고침
-            const commentResponse = await fetchComments(id);
-            setComments(commentResponse.data.data);
+    // 🚨 신고 전송 로직 (추후 백엔드 연결)
+    const handleReportSubmit = async () => {
+        if (!reportReason.trim()) {
+            alert('신고 사유를 입력해주세요.');
+            return;
+        }
+        try {
+            // 백엔드 API 호출 부분 (현재 백엔드 구현 후 연결)
+            await axiosInstance.post('/api/community/reports', {
+                targetType: reportTarget.type,
+                targetId: reportTarget.id,
+                reason: reportReason
+            });
+            alert('신고가 정상적으로 접수되었습니다.\n관리자 검토 후 조치됩니다.');
+            setIsReportModalOpen(false);
+            setReportReason('');
         } catch (error) {
-            alert("댓글 수정에 실패했습니다.");
+            alert('신고 접수에 실패했습니다.');
         }
     };
 
-    if (loading) return <div className="min-h-screen flex justify-center items-center bg-gray-50 font-bold text-gray-500">불러오는 중...</div>;
-    if (!post) return null;
+    if (loading) return <div className="min-h-screen flex items-center justify-center">로딩중...</div>;
+    if (!post) return <div className="min-h-screen flex items-center justify-center">게시글이 없습니다.</div>;
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gray-50 py-10">
+            <div className="max-w-4xl mx-auto px-4">
 
-                {/* 상단 버튼 영역 */}
-                <div className="flex justify-between items-center mb-6">
-                    <button onClick={() => navigate('/community')} className="text-gray-500 hover:text-blue-600 font-bold flex items-center">
-                        ← 목록으로 돌아가기
-                    </button>
-
-                    {/* 내 게시글일 때만 수정/삭제 버튼 노출 */}
-                    {currentUserName === post.author && (
-                        <div className="space-x-3">
-                            <button onClick={() => navigate(`/community/edit/${id}`)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-bold text-sm">
-                                수정
-                            </button>
-                            <button onClick={handleDeletePost} className="px-4 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 font-bold text-sm">
-                                삭제
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* 게시글 본문 */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                    <div className="p-8 border-b border-gray-100 bg-gray-50/50">
-                        <div className="mb-3">
-                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-md">{post.category}</span>
-                        </div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
-                        <div className="flex text-sm text-gray-500 space-x-4 font-medium">
-                            <span className="text-gray-700">{post.author}</span>
-                            <span>|</span><span>{post.date}</span>
-                            <span>|</span><span>조회수 {post.views}</span>
+                {/* --- 게시글 본문 영역 --- */}
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8 mb-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold mb-3 inline-block">
+                                {post.category || '일반'}
+                            </span>
+                            <h1 className="text-3xl font-black text-gray-900">{post.title}</h1>
                         </div>
                     </div>
-                    <div className="p-8 min-h-[300px] text-gray-800 whitespace-pre-wrap leading-relaxed text-lg">
+
+                    <div className="flex items-center justify-between text-sm text-gray-500 border-b pb-6 mb-6">
+                        <div className="flex items-center space-x-4">
+                            <span className="flex items-center"><User className="w-4 h-4 mr-1"/> {post.author}</span>
+                            <span className="flex items-center"><Clock className="w-4 h-4 mr-1"/> {post.date}</span>
+                            <span className="flex items-center"><Eye className="w-4 h-4 mr-1"/> {post.views}</span>
+                        </div>
+
+                        {/* 🚀 액션 버튼 영역 (수정/삭제/신고) */}
+                        <div className="flex space-x-3">
+                            {/* 작성자이거나 관리자일 때 삭제 허용 */}
+                            {(currentUser?.name === post.author || isAdmin) && (
+                                <button onClick={handleDeletePost} className="text-red-500 font-bold hover:underline">
+                                    {isAdmin ? '👑 관리자 강제삭제' : '삭제'}
+                                </button>
+                            )}
+
+                            {/* 작성자가 아닐 때만 신고 버튼 노출 */}
+                            {currentUser && currentUser?.name !== post.author && !isAdmin && (
+                                <button onClick={() => openReportModal('POST', post.id)} className="flex items-center text-orange-500 font-bold hover:underline">
+                                    <AlertTriangle className="w-4 h-4 mr-1" /> 신고
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="min-h-[300px] text-gray-800 leading-relaxed whitespace-pre-wrap">
                         {post.content}
                     </div>
                 </div>
 
-                {/* 댓글 영역 */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">
-                        댓글 <span className="text-blue-600">{comments.length}</span>
+                {/* --- 댓글 영역 --- */}
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8">
+                    <h3 className="text-lg font-black flex items-center mb-6">
+                        <MessageSquare className="w-5 h-5 mr-2 text-blue-500" />
+                        댓글 <span className="text-blue-600 ml-2">{comments.length}</span>
                     </h3>
 
-                    {/* 새 댓글 작성 폼 */}
-                    <form onSubmit={handleAddComment} className="mb-8">
-                        <div className="flex gap-4">
-                            <textarea
-                                rows="3"
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="댓글을 남겨보세요."
-                                className="flex-1 border border-gray-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            ></textarea>
-                            <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
-                                등록
-                            </button>
-                        </div>
+                    {/* 댓글 입력창 */}
+                    <form onSubmit={handleAddComment} className="flex gap-4 mb-8">
+                        <input
+                            type="text"
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder={currentUser ? "댓글을 남겨보세요." : "로그인 후 댓글을 작성할 수 있습니다."}
+                            disabled={!currentUser}
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button type="submit" disabled={!currentUser} className="bg-blue-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-blue-700 disabled:bg-gray-300">
+                            등록
+                        </button>
                     </form>
 
                     {/* 댓글 목록 */}
                     <div className="space-y-6">
-                        {comments.length === 0 ? (
-                            <div className="text-center text-gray-500 py-4">아직 작성된 댓글이 없습니다.</div>
-                        ) : (
-                            comments.map((comment) => (
-                                <div key={comment.id} className="border-b border-gray-100 pb-6 last:border-0">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center space-x-3">
-                                            <span className="font-bold text-gray-900">{comment.author}</span>
-                                            <span className="text-sm text-gray-400">{comment.date}</span>
-                                        </div>
-
-                                        {/* 내 댓글일 때만 노출되는 버튼들 */}
-                                        {currentUserName === comment.author && (
-                                            <div className="space-x-3">
-                                                <button
-                                                    onClick={() => handleEditClick(comment)}
-                                                    className="text-sm text-gray-400 hover:text-blue-600 font-medium"
-                                                >
-                                                    수정
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteComment(comment.id)}
-                                                    className="text-sm text-red-400 hover:text-red-600 font-medium"
-                                                >
-                                                    삭제
-                                                </button>
-                                            </div>
+                        {comments.map((comment) => (
+                            <div key={comment.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center space-x-3">
+                                        <span className="font-bold text-gray-900">{comment.author}</span>
+                                        <span className="text-xs text-gray-400">{comment.date}</span>
+                                    </div>
+                                    <div className="flex space-x-3 text-xs">
+                                        {/* 댓글 삭제 (작성자 또는 관리자) */}
+                                        {(currentUser?.name === comment.author || isAdmin) && (
+                                            <button onClick={() => handleDeleteComment(comment.id)} className="text-red-400 hover:text-red-600 font-bold">
+                                                삭제
+                                            </button>
+                                        )}
+                                        {/* 댓글 신고 */}
+                                        {currentUser && currentUser?.name !== comment.author && !isAdmin && (
+                                            <button onClick={() => openReportModal('COMMENT', comment.id)} className="text-orange-400 hover:text-orange-600 font-bold">
+                                                신고
+                                            </button>
                                         )}
                                     </div>
-
-                                    {/* 🚀 현재 이 댓글이 '수정 모드'인지 확인해서 화면을 다르게 보여줌 */}
-                                    {editingCommentId === comment.id ? (
-                                        <div className="mt-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                            <textarea
-                                                value={editCommentContent}
-                                                onChange={(e) => setEditCommentContent(e.target.value)}
-                                                className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
-                                                rows="3"
-                                            ></textarea>
-                                            <div className="flex justify-end space-x-2 mt-3">
-                                                <button onClick={handleCancelEdit} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-bold transition shadow-sm">
-                                                    취소
-                                                </button>
-                                                <button onClick={() => handleUpdateComment(comment.id)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-bold transition shadow-sm">
-                                                    수정 완료
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
-                                    )}
                                 </div>
-                            ))
-                        )}
+                                <p className="text-gray-700 text-sm">{comment.content}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
+
             </div>
+
+            {/* 🚨 신고 모달창 UI */}
+            {isReportModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center text-orange-500 mb-4">
+                            <AlertTriangle className="w-8 h-8 mr-2" />
+                            <h2 className="text-2xl font-black text-gray-900">신고하기</h2>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-6">부적절한 내용인가요? 관리자가 확인 후 조치하겠습니다.</p>
+
+                        <textarea
+                            value={reportReason}
+                            onChange={(e) => setReportReason(e.target.value)}
+                            placeholder="신고 사유를 상세히 적어주세요. (욕설, 도배, 광고 등)"
+                            className="w-full h-32 border border-gray-200 rounded-xl p-4 text-sm mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+
+                        <div className="flex space-x-3">
+                            <button onClick={() => setIsReportModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200">
+                                취소
+                            </button>
+                            <button onClick={handleReportSubmit} className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600">
+                                신고 접수하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
