@@ -2,6 +2,7 @@ package com.zoopzoop.zoopzoop.domain.admin.controller;
 
 import com.zoopzoop.zoopzoop.domain.admin.dto.*;
 import com.zoopzoop.zoopzoop.domain.admin.service.AdminService;
+import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
 import com.zoopzoop.zoopzoop.standard.response.ApiResponse;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,42 +18,59 @@ public class AdminController {
         this.adminService = adminService;
     }
 
-    // 📊 대시보드 통계 API
+    @GetMapping("/health")
+    public ApiResponse<HealthCheckDto> health() {
+        return ApiResponse.ok(adminService.getStatus());
+    }
+
     @GetMapping("/dashboard")
     public ApiResponse<AdminDashboardResponse> getDashboardStats() {
         return ApiResponse.ok(adminService.getDashboardStats());
     }
 
-    // 👥 유저 목록 API
     @GetMapping("/users")
     public ApiResponse<List<AdminUserResponse>> getAllUsers() {
         return ApiResponse.ok(adminService.getAllUsers());
     }
 
-    // 🚫 유저 강제 탈퇴 API
     @DeleteMapping("/users/{userId}")
     public ApiResponse<String> forceDeleteUser(@PathVariable Long userId) {
         adminService.forceDeleteUser(userId);
         return ApiResponse.ok("해당 유저가 성공적으로 삭제되었습니다.");
     }
 
-    // 📝 게시글 목록 API
     @GetMapping("/posts")
     public ApiResponse<List<AdminPostResponse>> getAllPosts() {
         return ApiResponse.ok(adminService.getAllPosts());
     }
 
-    // 🗑️ 게시글 삭제 API
     @DeleteMapping("/posts/{postId}")
     public ApiResponse<String> forceDeletePost(@PathVariable Long postId) {
         adminService.forceDeletePost(postId);
         return ApiResponse.ok("게시글이 성공적으로 삭제되었습니다.");
     }
 
-    // ⚙️ 정책 강제 동기화 API
     @PostMapping("/policies/sync")
     public ApiResponse<String> syncPolicies() {
         String result = adminService.syncPolicies();
-        return ApiResponse.ok(result); // 성공 메시지 혹은 실패 로그를 프론트로 전달
+        return ApiResponse.ok(result);
+    }
+
+    // 🚨 신고 관리 API
+    @GetMapping("/reports")
+    public ApiResponse<List<AdminReportResponse>> getPendingReports() {
+        return ApiResponse.ok(adminService.getPendingReports());
+    }
+
+    @PutMapping("/reports/{reportId}/resolve")
+    public ApiResponse<String> resolveReport(@PathVariable Long reportId) {
+        adminService.resolveReport(reportId);
+        return ApiResponse.ok("신고 처리가 완료되었습니다.");
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ApiResponse<String> forceDeleteComment(@PathVariable Long commentId) {
+        adminService.forceDeleteComment(commentId);
+        return ApiResponse.ok("댓글이 강제로 삭제되었습니다.");
     }
 }
