@@ -39,6 +39,10 @@ public class SecurityConfig {
                         .accessDeniedHandler(securityExceptionHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // 🚀 1. 커뮤니티 조회(GET)만 누구나 볼 수 있게 허용!
+                        .requestMatchers(HttpMethod.GET, "/api/policies/**", "/api/community/**").permitAll()
+
+                        // 🚀 2. 로그인 관련 경로는 무조건 통과 (여기서 커뮤니티가 싹 빠졌습니다!)
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/auth/**",
@@ -46,13 +50,12 @@ public class SecurityConfig {
                                 "/api/chatbot/**",
                                 "/api/users/health",
                                 "/h2-console/**",
-                                "/api/policies",
-                                "/api/policies/**",
-                                "/api/community",
-                                "/api/community/**",
                                 "/error"
                         ).permitAll()
+
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 🚀 3. 그 외 모든 요청(글쓰기, 댓글작성, 삭제 등)은 토큰 필수!
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
