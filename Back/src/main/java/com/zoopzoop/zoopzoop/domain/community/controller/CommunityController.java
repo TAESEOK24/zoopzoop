@@ -79,4 +79,15 @@ public class CommunityController {
         communityService.createReport(request);
         return ApiResponse.ok("신고가 접수되었습니다.");
     }
+
+    // 🚀 나의 활동 (마이페이지) API
+    @GetMapping("/my-posts")
+    public ApiResponse<List<PostResponse>> getMyPosts() {
+        return ApiResponse.ok(communityService.getMyPosts());
+    }
+
+    @GetMapping("/my-comments")
+    public ApiResponse<List<CommentDto.Response>> getMyComments() {
+        return ApiResponse.ok(communityService.getMyComments());
+    }
 }
