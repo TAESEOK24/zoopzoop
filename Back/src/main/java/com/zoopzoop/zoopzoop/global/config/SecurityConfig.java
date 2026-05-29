@@ -54,6 +54,7 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // 🚀 3. 그 외 모든 요청(글쓰기, 댓글작성, 삭제 등)은 토큰 필수!
                         .anyRequest().authenticated()
