@@ -39,6 +39,11 @@ public class AdminController {
         return ApiResponse.ok("해당 유저가 성공적으로 삭제되었습니다.");
     }
 
+    @PutMapping("/users/{userId}/grant-admin")
+    public ApiResponse<AdminUserResponse> grantAdminRole(@PathVariable Long userId) {
+        return ApiResponse.ok(adminService.grantAdminRole(userId));
+    }
+
     @GetMapping("/posts")
     public ApiResponse<List<AdminPostResponse>> getAllPosts() {
         return ApiResponse.ok(adminService.getAllPosts());

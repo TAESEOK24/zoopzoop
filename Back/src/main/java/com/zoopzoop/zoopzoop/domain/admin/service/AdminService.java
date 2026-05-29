@@ -8,8 +8,10 @@ import com.zoopzoop.zoopzoop.domain.community.repository.ReportRepository;
 import com.zoopzoop.zoopzoop.domain.community.service.CommunityService;
 import com.zoopzoop.zoopzoop.domain.policy.repository.PolicyListRepository;
 import com.zoopzoop.zoopzoop.domain.policy.service.PolicySyncService;
+import com.zoopzoop.zoopzoop.domain.user.entity.User;
 import com.zoopzoop.zoopzoop.domain.user.repository.UserRepository;
 import com.zoopzoop.zoopzoop.domain.user.service.UserService;
+import com.zoopzoop.zoopzoop.global.exception.AppException;
 import com.zoopzoop.zoopzoop.standard.dto.HealthCheckDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,6 +72,15 @@ public class AdminService {
     @Transactional
     public void forceDeleteUser(Long targetUserId) {
         userService.withdraw(targetUserId);
+    }
+
+    @Transactional
+    public AdminUserResponse grantAdminRole(Long targetUserId) {
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new AppException(404, "User not found."));
+
+        user.grantAdminRole();
+        return AdminUserResponse.from(user);
     }
 
     @Transactional(readOnly = true)
