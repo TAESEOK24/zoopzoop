@@ -6,7 +6,6 @@ import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotConversationMessage;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotRecommendationDto;
 import com.zoopzoop.zoopzoop.domain.chatbot.dto.ChatbotResponseType;
 import com.zoopzoop.zoopzoop.domain.policy.dto.PolicySearchResultDto;
-import com.zoopzoop.zoopzoop.global.exception.AppException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -19,9 +18,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class OpenAiChatbotClient implements ChatbotAiClient {
-
-    private static final String FALLBACK_SUMMARY =
-            "대화를 이어가며 도와드릴게요. 궁금한 정책 대상이나 상황을 조금 더 말씀해 주세요.";
 
     private final ChatClient chatClient;
     private final String classificationModel;
@@ -81,7 +77,7 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
     ) {
         if (chatClient == null) {
             log.warn("ChatModel bean is not available. Using fallback chatbot response.");
-            return fallbackAiResult(policies);
+            return fallbackAiResult(userMessage, policies);
         }
 
         try {
@@ -95,15 +91,14 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
                     .content();
 
             if (content == null || content.isBlank()) {
-                throw new AppException(502, "AI response is empty.");
+                log.warn("Spring AI OpenAI response was empty. Using fallback chatbot response.");
+                return fallbackAiResult(userMessage, policies);
             }
 
-            return parseAiResult(content, policies);
-        } catch (AppException exception) {
-            throw exception;
+            return parseAiResult(content, userMessage, policies);
         } catch (Exception exception) {
-            log.error("Spring AI OpenAI request failed", exception);
-            throw new AppException(502, "AI response generation failed.");
+            log.warn("Spring AI OpenAI request failed. Using fallback chatbot response.", exception);
+            return fallbackAiResult(userMessage, policies);
         }
     }
 
@@ -225,12 +220,12 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
         }
     }
 
-    private ChatbotAiResult parseAiResult(String content, List<PolicySearchResultDto> policies) {
+    private ChatbotAiResult parseAiResult(String content, String userMessage, List<PolicySearchResultDto> policies) {
         try {
             ChatbotAiResult result = objectMapper.readValue(content, ChatbotAiResult.class);
             String summary = result.summary();
             if (summary == null || summary.isBlank()) {
-                return fallbackAiResult(policies);
+                return fallbackAiResult(userMessage, policies);
             }
 
             List<ChatbotRecommendationDto> recommendations = result.recommendations() == null
@@ -247,11 +242,11 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
             return new ChatbotAiResult(summary.trim(), recommendations);
         } catch (Exception parseException) {
             log.warn("Failed to parse AI response as JSON, using fallback summary");
-            return fallbackAiResult(policies);
+            return fallbackAiResult(userMessage, policies);
         }
     }
 
-    private ChatbotAiResult fallbackAiResult(List<PolicySearchResultDto> policies) {
+    private ChatbotAiResult fallbackAiResult(String userMessage, List<PolicySearchResultDto> policies) {
         List<ChatbotRecommendationDto> recommendations = policies.stream()
                 .limit(3)
                 .map(policy -> new ChatbotRecommendationDto(
@@ -260,7 +255,30 @@ public class OpenAiChatbotClient implements ChatbotAiClient {
                 ))
                 .toList();
 
-        return new ChatbotAiResult(FALLBACK_SUMMARY, recommendations);
+        return new ChatbotAiResult(fallbackSummary(userMessage, policies), recommendations);
+    }
+
+    private String fallbackSummary(String userMessage, List<PolicySearchResultDto> policies) {
+        String message = userMessage == null ? "" : userMessage.trim();
+        if (policies.isEmpty()) {
+            return "조건에 맞는 정책을 바로 찾지 못했어요. 대상이나 상황을 조금 더 구체적으로 알려주시면 다시 찾아볼게요.";
+        }
+        if (message.contains("50대 이상")) {
+            return "네, 50대 이상이 받을 수 있는 정책을 찾아봤어요.";
+        }
+        if (message.contains("50대") || message.contains("50세")) {
+            return "네, 50대 조건에 맞는 정책을 찾아봤어요.";
+        }
+        if (message.contains("창업")) {
+            return "네, 창업과 관련된 정책을 찾아봤어요.";
+        }
+        if (message.contains("주거") || message.contains("월세") || message.contains("전세")) {
+            return "네, 주거와 관련된 정책을 찾아봤어요.";
+        }
+        if (message.contains("취업") || message.contains("구직") || message.contains("일자리")) {
+            return "네, 취업과 관련된 정책을 찾아봤어요.";
+        }
+        return "네, 질문과 관련된 정책을 찾아봤어요.";
     }
 
     private String nullSafe(String value) {

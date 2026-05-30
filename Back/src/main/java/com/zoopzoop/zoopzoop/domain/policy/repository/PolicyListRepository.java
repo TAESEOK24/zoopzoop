@@ -18,6 +18,8 @@ public interface PolicyListRepository extends JpaRepository<PolicyList, String>,
                or lower(coalesce(p.target, '')) like lower(concat('%', :keyword, '%'))
                or lower(coalesce(p.supportContent, '')) like lower(concat('%', :keyword, '%'))
                or lower(coalesce(p.applicationMethod, '')) like lower(concat('%', :keyword, '%'))
+               or lower(coalesce(p.serviceType, '')) like lower(concat('%', :keyword, '%'))
+               or lower(coalesce(p.orgName, '')) like lower(concat('%', :keyword, '%'))
                or lower(coalesce(p.departmentName, '')) like lower(concat('%', :keyword, '%'))
             order by p.viewCount desc, p.createdAt desc
             """)
@@ -32,6 +34,8 @@ public interface PolicyListRepository extends JpaRepository<PolicyList, String>,
                 or lower(coalesce(p.target, '')) like lower(concat('%', :keyword, '%'))
                 or lower(coalesce(p.supportContent, '')) like lower(concat('%', :keyword, '%'))
                 or lower(coalesce(p.applicationMethod, '')) like lower(concat('%', :keyword, '%'))
+                or lower(coalesce(p.serviceType, '')) like lower(concat('%', :keyword, '%'))
+                or lower(coalesce(p.orgName, '')) like lower(concat('%', :keyword, '%'))
                 or lower(coalesce(p.departmentName, '')) like lower(concat('%', :keyword, '%'))
             )
               and exists (

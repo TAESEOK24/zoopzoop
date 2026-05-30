@@ -28,7 +28,12 @@ public class ChatbotService {
     private static final int SEARCH_SIZE = 3;
     private static final Pattern AGE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*(?:세|살)");
     private static final Pattern AGE_CONTEXT_PATTERN = Pattern.compile("(?:나이|연령)\\D{0,8}(\\d{1,3})");
+    private static final Pattern AGE_DECADE_PATTERN = Pattern.compile("(\\d{2,3})\\s*대");
+    private static final Pattern KOREAN_AGE_PATTERN = Pattern.compile(
+            "(스물아홉|스물여덟|스물일곱|스물여섯|스물다섯|스물넷|스물네|스물셋|스물세|스물둘|스물두|스물한|스물하나|스무|스물)\\s*(?:세|살)"
+    );
     private static final Pattern ONLY_NUMBER_PATTERN = Pattern.compile("\\d{1,3}");
+    private static final Pattern REQUESTED_COUNT_PATTERN = Pattern.compile("(\\d{1,2})\\s*개");
 
     private final PolicySearchService policySearchService;
     private final ChatbotAiClient chatbotAiClient;
@@ -103,12 +108,55 @@ public class ChatbotService {
             return null;
         }
 
-        if (isSpecificPolicySearchQuestion(message) || isApplicationConditionQuestion(message)) {
+        String recentPolicyContext = findRecentPolicyContext(history);
+        if (recentPolicyContext != null && isMorePolicyRequest(message)) {
+            return buildPolicySearchResponse(
+                    sessionId,
+                    history,
+                    recentPolicyContext,
+                    ChatbotResponseType.POLICY_SEARCH,
+                    extractRequestedPolicyCount(message)
+            );
+        }
+
+        if (isSpecificPolicySearchQuestion(message) || isPolicyCategoryQuestion(message) || isApplicationConditionQuestion(message)) {
+            if (extractAge(message == null ? "" : message.trim().toLowerCase(), false) != null) {
+                intakeMemory.updateProfile(sessionId, existing -> {
+                    mergeProfile(existing, message);
+                    return existing;
+                });
+            }
+            return buildPolicySearchResponse(sessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
+        }
+
+        if (hasProfileContext(profile) && isPolicyCategoryAnswer(message)) {
+            return buildPolicySearchResponse(sessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
+        }
+
+        if (!profile.isAwaitingClarification()
+                && recentPolicyContext != null
+                && isProfileContextOnlyMessage(message)) {
+            intakeMemory.updateProfile(sessionId, existing -> {
+                mergeProfile(existing, message);
+                return existing;
+            });
+            return buildPolicySearchResponse(sessionId, history, recentPolicyContext, ChatbotResponseType.POLICY_SEARCH);
+        }
+
+        if (isAgeBenefitSearchQuestion(message)) {
+            intakeMemory.updateProfile(sessionId, existing -> {
+                mergeProfile(existing, message);
+                return existing;
+            });
             return buildPolicySearchResponse(sessionId, history, message, ChatbotResponseType.POLICY_SEARCH);
         }
 
         if (isBroadPolicyClarificationQuestion(message)) {
             return buildPolicyCategoryClarificationResponse(sessionId);
+        }
+
+        if (!profile.isAwaitingClarification() && isProfileContextOnlyMessage(message)) {
+            return buildProfileContextFollowUpResponse(sessionId, message);
         }
 
         if (isBroadBenefitClarificationQuestion(message)
@@ -126,9 +174,24 @@ public class ChatbotService {
             String message,
             ChatbotResponseType responseType
     ) {
+        return buildPolicySearchResponse(sessionId, history, message, responseType, SEARCH_SIZE);
+    }
+
+    private ChatbotAskResponse buildPolicySearchResponse(
+            String sessionId,
+            List<ChatbotConversationMessage> history,
+            String message,
+            ChatbotResponseType responseType,
+            int searchSize
+    ) {
         ChatbotIntakeMemory.ChatbotIntakeProfile profile = intakeMemory.getProfile(sessionId);
-        String query = buildSearchQuery(message, profile);
-        List<PolicySearchResultDto> policies = policySearchService.searchPolicies(query, SEARCH_SIZE, profile.age());
+        String normalizedMessage = message == null ? "" : message.trim().toLowerCase();
+        Integer effectiveAge = profile.age() != null ? profile.age() : extractAge(normalizedMessage, false);
+        String effectiveAgeGroup = profile.ageGroup() != null
+                ? profile.ageGroup()
+                : effectiveAge != null ? resolveAgeGroup(effectiveAge) : null;
+        String query = buildSearchQuery(message, profile, effectiveAge, effectiveAgeGroup);
+        List<PolicySearchResultDto> policies = policySearchService.searchPolicies(query, searchSize, effectiveAge);
         List<ChatbotReferenceDto> references = policies.stream()
                 .map(policy -> new ChatbotReferenceDto(
                         policy.serviceId(),
@@ -243,6 +306,32 @@ public class ChatbotService {
         );
     }
 
+    private ChatbotAskResponse buildProfileContextFollowUpResponse(String sessionId, String message) {
+        ChatbotIntakeMemory.ChatbotIntakeProfile profile = intakeMemory.updateProfile(sessionId, existing -> {
+            mergeProfile(existing, message);
+            return existing;
+        });
+
+        String agePrefix = profile.age() != null
+                ? profile.age() + "살이면 "
+                : profile.ageGroup() != null ? profile.ageGroup() + "이라면 " : "";
+
+        return new ChatbotAskResponse(
+                sessionId,
+                agePrefix + "관련 지원을 더 잘 찾을 수 있어요. 주거, 취업, 생활비, 창업 중 어떤 분야가 궁금하세요?",
+                ChatbotResponseType.CLARIFICATION_NEEDED,
+                List.of(
+                        new ChatbotSuggestedReplyDto("주거 지원", "청년 주거 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("취업 지원", "청년 취업 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("생활비 지원", "청년 생활비 지원 정책 알려줘"),
+                        new ChatbotSuggestedReplyDto("창업 지원", "청년 창업 지원 정책 알려줘")
+                ),
+                List.of(),
+                List.of(),
+                0
+        );
+    }
+
     private void mergeProfile(ChatbotIntakeMemory.ChatbotIntakeProfile profile, String rawMessage) {
         String message = rawMessage == null ? "" : rawMessage.trim().toLowerCase();
 
@@ -290,12 +379,49 @@ public class ChatbotService {
             return contextualAge;
         }
 
+        Integer decadeAge = extractAgeWithPattern(AGE_DECADE_PATTERN, message);
+        if (decadeAge != null) {
+            return decadeAge;
+        }
+
+        Integer koreanAge = extractKoreanAge(message);
+        if (koreanAge != null) {
+            return koreanAge;
+        }
+
         if (awaitingAgeAnswer && ONLY_NUMBER_PATTERN.matcher(message).matches()) {
             int age = Integer.parseInt(message);
             return isValidAge(age) ? age : null;
         }
 
         return null;
+    }
+
+    private Integer extractKoreanAge(String message) {
+        Matcher matcher = KOREAN_AGE_PATTERN.matcher(message);
+        while (matcher.find()) {
+            Integer age = koreanAgeWordToNumber(matcher.group(1));
+            if (age != null && isValidAge(age)) {
+                return age;
+            }
+        }
+        return null;
+    }
+
+    private Integer koreanAgeWordToNumber(String word) {
+        return switch (word) {
+            case "스무", "스물" -> 20;
+            case "스물하나", "스물한" -> 21;
+            case "스물둘", "스물두" -> 22;
+            case "스물셋", "스물세" -> 23;
+            case "스물넷", "스물네" -> 24;
+            case "스물다섯" -> 25;
+            case "스물여섯" -> 26;
+            case "스물일곱" -> 27;
+            case "스물여덟" -> 28;
+            case "스물아홉" -> 29;
+            default -> null;
+        };
     }
 
     private Integer extractAgeWithPattern(Pattern pattern, String message) {
@@ -327,14 +453,23 @@ public class ChatbotService {
     }
 
     private String buildSearchQuery(String message, ChatbotIntakeMemory.ChatbotIntakeProfile profile) {
+        return buildSearchQuery(message, profile, profile.age(), profile.ageGroup());
+    }
+
+    private String buildSearchQuery(
+            String message,
+            ChatbotIntakeMemory.ChatbotIntakeProfile profile,
+            Integer effectiveAge,
+            String effectiveAgeGroup
+    ) {
         List<String> tokens = new ArrayList<>();
         tokens.add(message);
 
-        if (profile.ageGroup() != null) {
-            tokens.add(profile.ageGroup());
+        if (effectiveAgeGroup != null) {
+            tokens.add(effectiveAgeGroup);
         }
-        if (profile.age() != null) {
-            tokens.add(profile.age() + "세");
+        if (effectiveAge != null) {
+            tokens.add(effectiveAge + "세");
         }
         if (profile.householdType() != null) {
             tokens.add(profile.householdType());
@@ -420,6 +555,29 @@ public class ChatbotService {
         return profile.ageGroup() != null && profile.householdType() != null;
     }
 
+    private boolean hasProfileContext(ChatbotIntakeMemory.ChatbotIntakeProfile profile) {
+        return profile.ageGroup() != null
+                || profile.age() != null
+                || profile.householdType() != null
+                || profile.employmentStatus() != null
+                || profile.housingStatus() != null;
+    }
+
+    private String findRecentPolicyContext(List<ChatbotConversationMessage> history) {
+        for (int index = history.size() - 1; index >= 0; index--) {
+            ChatbotConversationMessage message = history.get(index);
+            if (!"user".equals(message.role())) {
+                continue;
+            }
+
+            String content = message.content();
+            if (isSpecificPolicySearchQuestion(content) || isPolicyCategoryQuestion(content)) {
+                return content;
+            }
+        }
+        return null;
+    }
+
     private boolean isBroadPolicyClarificationQuestion(String message) {
         if (message == null) {
             return false;
@@ -484,6 +642,16 @@ public class ChatbotService {
         );
     }
 
+    private boolean isPolicyCategoryQuestion(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return isPolicyCategoryAnswer(normalized)
+                && (normalized.length() <= 20 || containsAny(normalized, "정책", "지원", "혜택", "추천", "알려", "찾아", "있어", "궁금"));
+    }
+
     private boolean isApplicationConditionQuestion(String message) {
         if (message == null) {
             return false;
@@ -491,6 +659,69 @@ public class ChatbotService {
 
         String normalized = message.trim().toLowerCase();
         return containsAny(normalized, "신청 조건", "신청 자격", "지원 조건", "대상 조건");
+    }
+
+    private boolean isMorePolicyRequest(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return containsAny(normalized, "더 보여", "더 찾아", "더 추천", "추가", "다른", "또", "더 있어", "더 알려")
+                || REQUESTED_COUNT_PATTERN.matcher(normalized).find();
+    }
+
+    private int extractRequestedPolicyCount(String message) {
+        if (message == null) {
+            return SEARCH_SIZE;
+        }
+
+        Matcher matcher = REQUESTED_COUNT_PATTERN.matcher(message);
+        if (!matcher.find()) {
+            return SEARCH_SIZE;
+        }
+
+        int requestedCount = Integer.parseInt(matcher.group(1));
+        return Math.max(1, Math.min(requestedCount, 10));
+    }
+
+    private boolean isAgeBenefitSearchQuestion(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return extractAge(normalized, false) != null
+                && containsAny(normalized, "받을 수", "가능", "대상", "정책", "지원", "혜택", "추천", "찾아", "알려", "있어");
+    }
+
+    private boolean isPolicyCategoryAnswer(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return containsAny(
+                normalized,
+                "주거", "월세", "전세",
+                "취업", "구직", "일자리",
+                "생활비", "생계", "지원금",
+                "창업", "사업",
+                "돌봄", "출산", "육아", "임신", "보육",
+                "교육", "문화", "교통",
+                "의료", "건강", "장애", "다문화",
+                "긴급복지", "대출", "보증금"
+        );
+    }
+
+    private boolean isProfileContextOnlyMessage(String message) {
+        if (message == null) {
+            return false;
+        }
+
+        String normalized = message.trim().toLowerCase();
+        return extractAge(normalized, false) != null
+                || containsAny(normalized, "청년", "20대", "30대 초반", "대학생", "중장년", "40대", "50대", "장년", "노년", "어르신", "고령");
     }
 
     private boolean isLikelyProfileAnswer(String message) {

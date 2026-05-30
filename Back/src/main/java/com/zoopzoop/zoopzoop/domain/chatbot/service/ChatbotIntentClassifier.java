@@ -14,11 +14,12 @@ public class ChatbotIntentClassifier {
 
     private static final List<String> POLICY_KEYWORDS = List.of(
             "정책", "복지", "지원", "지원금", "수당", "급여", "주거", "월세", "전세", "청년",
-            "구직", "취업", "실업", "돌봄", "출산", "육아", "생계", "긴급복지", "대출", "신청"
+            "구직", "취업", "실업", "돌봄", "출산", "육아", "생계", "긴급복지", "대출", "신청",
+            "창업", "사업", "교육", "문화", "교통", "의료", "건강", "장애", "다문화", "임신", "보육"
     );
 
     private static final List<String> POLICY_ASK_KEYWORDS = List.of(
-            "알려", "추천", "찾아", "뭐가 있", "있을까", "궁금", "신청", "받을 수", "대상", "조건", "문의"
+            "정책", "지원", "혜택", "알려", "추천", "찾아", "뭐가 있", "있을까", "궁금", "신청", "받을 수", "대상", "조건", "문의"
     );
 
     private static final List<String> HARDSHIP_KEYWORDS = List.of(

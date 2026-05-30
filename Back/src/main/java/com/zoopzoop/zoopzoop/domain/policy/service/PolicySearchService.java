@@ -12,6 +12,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -24,9 +26,23 @@ public class PolicySearchService {
 
     private static final int DEFAULT_SIZE = 5;
     private static final int MAX_SIZE = 10;
+    private static final Pattern MAX_AGE_INCLUSIVE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*세\\s*(?:이하|까지)");
+    private static final Pattern MAX_AGE_EXCLUSIVE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*세\\s*미만");
+    private static final Pattern MIN_AGE_INCLUSIVE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*세\\s*이상");
+    private static final Pattern AGE_RANGE_PATTERN = Pattern.compile("(?:만\\s*)?(\\d{1,3})\\s*(?:세)?\\s*[-~∼]\\s*(\\d{1,3})\\s*세");
     private static final List<String> STOP_WORDS = List.of(
             "정책", "지원", "알려줘", "알려주세요", "추천", "찾아줘", "찾아주세요",
             "뭐야", "뭐있어", "있어", "문의", "신청", "가능", "대상", "관련"
+    );
+    private static final List<String> TOPIC_KEYWORDS = List.of(
+            "창업",
+            "주거", "월세", "전세", "보증금",
+            "취업", "구직", "일자리",
+            "생활비", "생계", "긴급복지",
+            "교육", "문화", "교통",
+            "의료", "건강", "장애", "다문화",
+            "돌봄", "출산", "육아", "임신", "보육",
+            "대출"
     );
 
     private final PolicyListRepository policyListRepository;
@@ -39,6 +55,7 @@ public class PolicySearchService {
     public List<PolicySearchResultDto> searchPolicies(String keyword, Integer size, Integer age) {
         String normalizedKeyword = normalizeKeyword(keyword);
         int normalizedSize = normalizeSize(size);
+        List<String> requiredTopicTokens = extractRequiredTopicTokens(normalizedKeyword);
 
         List<PolicyList> directMatches = searchByKeyword(
                 normalizedKeyword,
@@ -46,13 +63,17 @@ public class PolicySearchService {
                 PageRequest.of(0, normalizedSize)
         );
 
-        if (!directMatches.isEmpty()) {
-            return directMatches.stream()
+        List<PolicyList> ageFilteredDirectMatches = filterByRequiredTopicTokens(
+                filterByTextAgeConstraints(directMatches, age),
+                requiredTopicTokens
+        );
+        if (!ageFilteredDirectMatches.isEmpty()) {
+            return ageFilteredDirectMatches.stream()
                     .map(this::toSearchResultDto)
                     .toList();
         }
 
-        return searchByKeywordTokens(normalizedKeyword, normalizedSize, age).stream()
+        return searchByKeywordTokens(normalizedKeyword, normalizedSize, age, requiredTopicTokens).stream()
                 .map(this::toSearchResultDto)
                 .toList();
     }
@@ -88,15 +109,23 @@ public class PolicySearchService {
         return Math.min(size, MAX_SIZE);
     }
 
-    private List<PolicyList> searchByKeywordTokens(String keyword, int size, Integer age) {
-        List<String> tokens = extractSearchTokens(keyword);
+    private List<PolicyList> searchByKeywordTokens(String keyword, int size, Integer age, List<String> requiredTopicTokens) {
+        List<String> tokens = requiredTopicTokens.isEmpty()
+                ? extractSearchTokens(keyword)
+                : requiredTopicTokens;
         if (tokens.isEmpty()) {
             return List.of();
         }
 
         Map<String, PolicyList> deduplicated = new LinkedHashMap<>();
         for (String token : tokens) {
-            List<PolicyList> matches = searchByKeyword(token, age, PageRequest.of(0, size));
+            List<PolicyList> matches = filterByRequiredTopicTokens(
+                    filterByTextAgeConstraints(
+                            searchByKeyword(token, age, PageRequest.of(0, size)),
+                            age
+                    ),
+                    requiredTopicTokens
+            );
             for (PolicyList policy : matches) {
                 deduplicated.putIfAbsent(policy.getServiceId(), policy);
                 if (deduplicated.size() >= size) {
@@ -106,6 +135,118 @@ public class PolicySearchService {
         }
 
         return deduplicated.values().stream().toList();
+    }
+
+    private List<String> extractRequiredTopicTokens(String keyword) {
+        String normalized = keyword.toLowerCase(Locale.ROOT);
+        return TOPIC_KEYWORDS.stream()
+                .filter(normalized::contains)
+                .distinct()
+                .toList();
+    }
+
+    private List<PolicyList> filterByRequiredTopicTokens(List<PolicyList> policies, List<String> requiredTopicTokens) {
+        if (requiredTopicTokens.isEmpty()) {
+            return policies;
+        }
+
+        return policies.stream()
+                .filter(policy -> matchesAnyRequiredTopic(policy, requiredTopicTokens))
+                .toList();
+    }
+
+    private boolean matchesAnyRequiredTopic(PolicyList policy, List<String> requiredTopicTokens) {
+        return requiredTopicTokens.stream().anyMatch(token -> matchesRequiredTopic(policy, token));
+    }
+
+    private boolean matchesRequiredTopic(PolicyList policy, String token) {
+        String normalizedToken = token.toLowerCase(Locale.ROOT);
+        if ("창업".equals(normalizedToken)) {
+            return policyCoreTopicText(policy).toLowerCase(Locale.ROOT).contains(normalizedToken);
+        }
+
+        return policySearchText(policy).toLowerCase(Locale.ROOT).contains(normalizedToken);
+    }
+
+    private List<PolicyList> filterByTextAgeConstraints(List<PolicyList> policies, Integer age) {
+        if (age == null) {
+            return policies;
+        }
+
+        return policies.stream()
+                .filter(policy -> matchesTextAgeConstraints(policy, age))
+                .toList();
+    }
+
+    private boolean matchesTextAgeConstraints(PolicyList policy, int age) {
+        String text = policySearchText(policy);
+
+        Integer maxInclusiveAge = extractFirstAge(MAX_AGE_INCLUSIVE_PATTERN, text);
+        if (maxInclusiveAge != null && age > maxInclusiveAge) {
+            return false;
+        }
+
+        Integer maxExclusiveAge = extractFirstAge(MAX_AGE_EXCLUSIVE_PATTERN, text);
+        if (maxExclusiveAge != null && age >= maxExclusiveAge) {
+            return false;
+        }
+
+        Integer minInclusiveAge = extractFirstAge(MIN_AGE_INCLUSIVE_PATTERN, text);
+        if (minInclusiveAge != null && age < minInclusiveAge) {
+            return false;
+        }
+
+        return matchesTextAgeRange(text, age);
+    }
+
+    private Integer extractFirstAge(Pattern pattern, String text) {
+        Matcher matcher = pattern.matcher(text);
+        if (!matcher.find()) {
+            return null;
+        }
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    private boolean matchesTextAgeRange(String text, int age) {
+        Matcher matcher = AGE_RANGE_PATTERN.matcher(text);
+        while (matcher.find()) {
+            int minAge = Integer.parseInt(matcher.group(1));
+            int maxAge = Integer.parseInt(matcher.group(2));
+            if (age < minAge || age > maxAge) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String nullSafe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String policySearchText(PolicyList policy) {
+        return String.join(" ",
+                nullSafe(policy.getServiceName()),
+                nullSafe(policy.getPurposeSummary()),
+                nullSafe(policy.getTarget()),
+                nullSafe(policy.getSelectionCriteria()),
+                nullSafe(policy.getSupportContent()),
+                nullSafe(policy.getApplicationMethod()),
+                nullSafe(policy.getServiceType()),
+                nullSafe(policy.getOrgName()),
+                nullSafe(policy.getDepartmentName())
+        );
+    }
+
+    private String policyCoreTopicText(PolicyList policy) {
+        return String.join(" ",
+                nullSafe(policy.getServiceName()),
+                nullSafe(policy.getPurposeSummary()),
+                nullSafe(policy.getSupportContent()),
+                nullSafe(policy.getApplicationMethod()),
+                nullSafe(policy.getServiceType()),
+                nullSafe(policy.getOrgName()),
+                nullSafe(policy.getDepartmentName())
+        );
     }
 
     private List<PolicyList> searchByKeyword(String keyword, Integer age, PageRequest pageRequest) {
