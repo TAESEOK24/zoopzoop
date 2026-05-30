@@ -64,6 +64,170 @@ class PolicySearchServiceTest {
     }
 
     @Test
+    void searchPoliciesFiltersTextAgeUpperBoundWhenAgeIsProvided() {
+        PolicyList youthOnlyPolicy = PolicyList.builder()
+                .serviceId("svc-youth")
+                .serviceName("청년전용창업자금")
+                .purposeSummary("창업 자금 지원")
+                .target("만39세 이하청년")
+                .supportContent("대출 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-youth")
+                .orgName("중소벤처기업부")
+                .departmentName("기업금융과")
+                .viewCount(100)
+                .createdAt(LocalDateTime.now())
+                .build();
+        PolicyList middleAgePolicy = PolicyList.builder()
+                .serviceId("svc-middle")
+                .serviceName("중장년 창업 지원")
+                .purposeSummary("창업 자금 지원")
+                .target("만40세 이상")
+                .supportContent("컨설팅 및 자금 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-middle")
+                .orgName("서울시")
+                .departmentName("창업지원과")
+                .viewCount(50)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(policyListRepository.searchByKeywordAndAge(eq("창업 중장년 50세"), eq(50), any()))
+                .thenReturn(List.of(youthOnlyPolicy, middleAgePolicy));
+
+        List<PolicySearchResultDto> results = policySearchService.searchPolicies("창업 중장년 50세", 3, 50);
+
+        assertEquals(1, results.size());
+        assertEquals("svc-middle", results.get(0).serviceId());
+    }
+
+    @Test
+    void searchPoliciesFiltersTextAgeRangeWhenAgeIsProvided() {
+        PolicyList youthOnlyPolicy = PolicyList.builder()
+                .serviceId("svc-youth-job")
+                .serviceName("청년일자리도약장려금")
+                .purposeSummary("취업애로청년을 정규직 채용한 기업에 지원금 지원")
+                .target("만 15-34세 청년")
+                .supportContent("취업애로청년 채용 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-youth-job")
+                .orgName("고용노동부")
+                .departmentName("청년채용기반과")
+                .viewCount(100)
+                .createdAt(LocalDateTime.now())
+                .build();
+        PolicyList middleAgePolicy = PolicyList.builder()
+                .serviceId("svc-middle")
+                .serviceName("중장년 창업 지원")
+                .purposeSummary("창업 자금 지원")
+                .target("만40세 이상")
+                .supportContent("컨설팅 및 자금 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-middle")
+                .orgName("서울시")
+                .departmentName("창업지원과")
+                .viewCount(50)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(policyListRepository.searchByKeywordAndAge(eq("창업 중장년 50세"), eq(50), any()))
+                .thenReturn(List.of(youthOnlyPolicy, middleAgePolicy));
+
+        List<PolicySearchResultDto> results = policySearchService.searchPolicies("창업 중장년 50세", 3, 50);
+
+        assertEquals(1, results.size());
+        assertEquals("svc-middle", results.get(0).serviceId());
+    }
+
+    @Test
+    void searchPoliciesRequiresTopicKeywordWhenQueryHasSpecificTopic() {
+        PolicyList unrelatedPolicy = PolicyList.builder()
+                .serviceId("svc-farmer")
+                .serviceName("여성농업인행복바우처지원")
+                .purposeSummary("여성 농업인에게 여가 및 문화 활동비용 지원")
+                .target("여성 농업인")
+                .supportContent("문화 활동비 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-farmer")
+                .orgName("대전광역시")
+                .departmentName("농생명정책과")
+                .viewCount(100)
+                .createdAt(LocalDateTime.now())
+                .build();
+        PolicyList startupPolicy = PolicyList.builder()
+                .serviceId("svc-startup")
+                .serviceName("청년전용창업자금")
+                .purposeSummary("창업 자금 지원")
+                .target("만39세 이하청년")
+                .supportContent("대출 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-startup")
+                .orgName("중소벤처기업부")
+                .departmentName("기업금융과")
+                .viewCount(50)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(policyListRepository.searchByKeywordAndAge(eq("내 나이가 20살인데 창업 지원 정책에 대해 추천해줄 수 있을까? 청년 20세"), eq(20), any()))
+                .thenReturn(List.of(unrelatedPolicy, startupPolicy));
+
+        List<PolicySearchResultDto> results = policySearchService.searchPolicies(
+                "내 나이가 20살인데 창업 지원 정책에 대해 추천해줄 수 있을까? 청년 20세",
+                3,
+                20
+        );
+
+        assertEquals(1, results.size());
+        assertEquals("svc-startup", results.get(0).serviceId());
+    }
+
+    @Test
+    void searchPoliciesDoesNotTreatStartupMentionInTargetAsStartupPolicy() {
+        PolicyList youthEmploymentPolicy = PolicyList.builder()
+                .serviceId("svc-youth-job")
+                .serviceName("청년일자리도약장려금")
+                .purposeSummary("취업애로청년을 정규직 채용한 기업에 지원금 지원")
+                .target("만 15-34세 청년, 폐업창업자 등")
+                .supportContent("취업애로청년을 정규직으로 채용하고 고용유지 시 지원금 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-youth-job")
+                .orgName("고용노동부")
+                .departmentName("청년채용기반과")
+                .viewCount(100)
+                .createdAt(LocalDateTime.now())
+                .build();
+        PolicyList startupPolicy = PolicyList.builder()
+                .serviceId("svc-startup")
+                .serviceName("중장년 창업 지원")
+                .purposeSummary("창업 자금 및 컨설팅 지원")
+                .target("중장년 예비창업자")
+                .supportContent("사업화 자금과 창업 컨설팅 지원")
+                .applicationMethod("온라인 신청")
+                .applicationDeadline("상시")
+                .detailUrl("https://example.com/policies/svc-startup")
+                .orgName("서울시")
+                .departmentName("창업지원과")
+                .viewCount(50)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(policyListRepository.searchByKeywordAndAge(eq("50대 창업 정책 중장년 50세"), eq(50), any()))
+                .thenReturn(List.of(youthEmploymentPolicy, startupPolicy));
+
+        List<PolicySearchResultDto> results = policySearchService.searchPolicies("50대 창업 정책 중장년 50세", 3, 50);
+
+        assertEquals(1, results.size());
+        assertEquals("svc-startup", results.get(0).serviceId());
+    }
+
+    @Test
     void searchPoliciesRejectsBlankKeyword() {
         AppException exception = assertThrows(AppException.class,
                 () -> policySearchService.searchPolicies(" ", 5));

@@ -4,6 +4,7 @@ import ChatMessageList from '../../components/Chatbot/ChatMessageList';
 import ChatInput from '../../components/Chatbot/ChatInput';
 import ChatHistorySidebar from '../../components/Chatbot/ChatHistorySidebar';
 import { askChatbot } from '../../api/chatbot';
+import { getUserName, isAuthenticated } from '../../api/authSession';
 
 const RESPONSE_TYPES = {
     POLICY_SEARCH: 'POLICY_SEARCH',
@@ -12,6 +13,12 @@ const RESPONSE_TYPES = {
     OFF_TOPIC: 'OFF_TOPIC',
     SAFETY: 'SAFETY'
 };
+
+const LEGACY_CHAT_HISTORY_KEY = 'chat_sessions';
+
+const getChatHistoryStorageKey = (userName) => (
+    userName ? `chat_sessions:${encodeURIComponent(userName)}` : null
+);
 
 
 
@@ -37,28 +44,72 @@ const AIChatPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [chatSessions, setChatSessions] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(() => isAuthenticated());
+    const [chatHistoryKey, setChatHistoryKey] = useState(() => (
+        isAuthenticated() ? getChatHistoryStorageKey(getUserName()) : null
+    ));
 
     useEffect(() => {
-        const stored = localStorage.getItem('chat_sessions');
+        const syncLoginState = () => {
+            const nextIsLoggedIn = isAuthenticated();
+            setIsLoggedIn(nextIsLoggedIn);
+            setChatHistoryKey(nextIsLoggedIn ? getChatHistoryStorageKey(getUserName()) : null);
+
+            if (!nextIsLoggedIn) {
+                setMessages([getInitialMessage()]);
+                setSessionId(null);
+                setLocalSessionId(Date.now().toString());
+                setChatSessions([]);
+                setIsSidebarOpen(false);
+            }
+        };
+
+        localStorage.removeItem(LEGACY_CHAT_HISTORY_KEY);
+        window.addEventListener('loginStateChange', syncLoginState);
+        window.addEventListener('storage', syncLoginState);
+
+        return () => {
+            window.removeEventListener('loginStateChange', syncLoginState);
+            window.removeEventListener('storage', syncLoginState);
+        };
+    }, []);
+
+    useEffect(() => {
+        localStorage.removeItem(LEGACY_CHAT_HISTORY_KEY);
+
+        if (!isLoggedIn || !chatHistoryKey) {
+            setChatSessions([]);
+            setIsSidebarOpen(false);
+            return;
+        }
+
+        const stored = localStorage.getItem(chatHistoryKey);
         if (!stored) {
+            setChatSessions([]);
             return;
         }
 
         try {
-            setChatSessions(JSON.parse(stored));
+            const parsedSessions = JSON.parse(stored);
+            setChatSessions(Array.isArray(parsedSessions) ? parsedSessions : []);
         } catch (error) {
             console.error('Failed to parse chat sessions', error);
+            setChatSessions([]);
         }
-    }, []);
+    }, [chatHistoryKey, isLoggedIn]);
 
     useEffect(() => {
-        if (messages.length <= 1) {
+        if (!isLoggedIn || !chatHistoryKey || messages.length <= 1) {
             return;
         }
 
         setChatSessions((previousSessions) => {
             const existingIndex = previousSessions.findIndex((session) => session.id === localSessionId);
-            const userMessages = messages.filter((message) => message.sender === 'user');
+            const persistedMessages = messages.filter((message) => !message.isTyping);
+            const userMessages = persistedMessages.filter((message) => message.sender === 'user');
+            if (userMessages.length === 0) {
+                return previousSessions;
+            }
             const title = userMessages.length > 0 ? userMessages[0].text : '새로운 대화';
 
             const nextSession = {
@@ -66,7 +117,7 @@ const AIChatPage = () => {
                 backendSessionId: sessionId,
                 title,
                 timestamp: new Date().toISOString(),
-                messages
+                messages: persistedMessages
             };
 
             let updatedSessions;
@@ -77,10 +128,10 @@ const AIChatPage = () => {
                 updatedSessions = [nextSession, ...previousSessions];
             }
 
-            localStorage.setItem('chat_sessions', JSON.stringify(updatedSessions));
+            localStorage.setItem(chatHistoryKey, JSON.stringify(updatedSessions));
             return updatedSessions;
         });
-    }, [localSessionId, messages, sessionId]);
+    }, [chatHistoryKey, isLoggedIn, localSessionId, messages, sessionId]);
 
     const handleReset = () => {
         const shouldReset = window.confirm('새로운 대화를 시작할까요? 이전 대화는 히스토리에 저장됩니다.');
@@ -95,7 +146,11 @@ const AIChatPage = () => {
     };
 
     const handleSelectSession = (session) => {
-        setMessages(session.messages);
+        if (!isLoggedIn) {
+            return;
+        }
+
+        setMessages(session.messages?.length ? session.messages : [getInitialMessage()]);
         setSessionId(session.backendSessionId);
         setLocalSessionId(session.id);
         setIsSidebarOpen(false);
@@ -205,14 +260,16 @@ const AIChatPage = () => {
                         >
                             <RotateCcw size={18} />
                         </button>
-                        <button
-                            onClick={() => setIsSidebarOpen(true)}
-                            className="rounded p-2 text-white transition-colors hover:bg-blue-700"
-                            title="대화 히스토리"
-                            aria-label="대화 히스토리"
-                        >
-                            <Clock size={18} />
-                        </button>
+                        {isLoggedIn && (
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="rounded p-2 text-white transition-colors hover:bg-blue-700"
+                                title="대화 히스토리"
+                                aria-label="대화 히스토리"
+                            >
+                                <Clock size={18} />
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -220,12 +277,14 @@ const AIChatPage = () => {
                 <ChatInput onSend={handleSend} disabled={isLoading} />
             </div>
 
-            <ChatHistorySidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                sessions={chatSessions}
-                onSelectSession={handleSelectSession}
-            />
+            {isLoggedIn && (
+                <ChatHistorySidebar
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    sessions={chatSessions}
+                    onSelectSession={handleSelectSession}
+                />
+            )}
         </div>
     );
 };

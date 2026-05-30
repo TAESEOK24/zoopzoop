@@ -56,6 +56,7 @@ logs/
 
 ## Assistant
 codex_preset_dukku
+Back/기업연계_프로젝트_결과보고서_초안.md
 
 # Local docker compose overrides (personal only)
 docker-compose.local.elasticsearch.override.yml

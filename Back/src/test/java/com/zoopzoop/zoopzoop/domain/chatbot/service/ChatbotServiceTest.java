@@ -151,6 +151,221 @@ class ChatbotServiceTest {
     }
 
     @Test
+    void askSearchesStartupPolicyKeywordWithoutProfileContext() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup",
+                        "Startup Grant",
+                        "Supports startup costs.",
+                        "Founders",
+                        "Grant support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-startup",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-startup")).thenReturn("session-startup");
+        when(conversationMemory.getRecentMessages("session-startup")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("창업 정책", 3, null)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("창업 정책", List.of(), policies))
+                .thenReturn(new ChatbotAiResult("창업 관련 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-startup", "창업 정책");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void askUsesRecentPolicyKeywordWhenUserAddsAgeContext() {
+        List<PolicySearchResultDto> firstPolicies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup-1",
+                        "Startup Grant",
+                        "Supports startup costs.",
+                        "Founders",
+                        "Grant support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-startup-1",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+        List<PolicySearchResultDto> ageMatchedPolicies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup-50",
+                        "Middle-aged Startup Support",
+                        "Supports startup costs for middle-aged founders.",
+                        "Middle-aged founders",
+                        "Startup consulting and grants",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-startup-50",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+        ChatbotConversationMessage previousUserMessage = new ChatbotConversationMessage("user", "창업 지원에 대해 알고 싶어");
+        ChatbotConversationMessage previousAssistantMessage = new ChatbotConversationMessage("assistant", "창업 관련 정책을 찾았어요.");
+
+        when(conversationMemory.resolveSessionId("session-startup-age")).thenReturn("session-startup-age");
+        when(conversationMemory.getRecentMessages("session-startup-age"))
+                .thenReturn(List.of())
+                .thenReturn(List.of(previousUserMessage, previousAssistantMessage));
+        when(policySearchService.searchPolicies("창업 지원에 대해 알고 싶어", 3, null)).thenReturn(firstPolicies);
+        when(policySearchService.searchPolicies("창업 지원에 대해 알고 싶어 중장년 50세", 3, 50)).thenReturn(ageMatchedPolicies);
+        when(chatbotAiClient.generateAnswer("창업 지원에 대해 알고 싶어", List.of(), firstPolicies))
+                .thenReturn(new ChatbotAiResult("창업 관련 정책을 찾았어요.", List.of()));
+        when(chatbotAiClient.generateAnswer("창업 지원에 대해 알고 싶어", List.of(previousUserMessage, previousAssistantMessage), ageMatchedPolicies))
+                .thenReturn(new ChatbotAiResult("50세 조건에 맞는 창업 지원 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse firstResponse = chatbotService.ask("session-startup-age", "창업 지원에 대해 알고 싶어");
+        ChatbotAskResponse secondResponse = chatbotService.ask("session-startup-age", "내 나이가 50세인데 그거에 맞게 찾아줘");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, firstResponse.responseType());
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, secondResponse.responseType());
+        assertEquals(1, secondResponse.matchedPolicyCount());
+        assertEquals("50세 조건에 맞는 창업 지원 정책을 찾았어요.", secondResponse.answer());
+        verify(policySearchService).searchPolicies("창업 지원에 대해 알고 싶어 중장년 50세", 3, 50);
+    }
+
+    @Test
+    void askSearchesStandalonePolicyCategoryKeyword() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-culture",
+                        "Culture Voucher",
+                        "Supports cultural activity costs.",
+                        "Residents",
+                        "Voucher support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-culture",
+                        "Seoul",
+                        "Culture Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-culture")).thenReturn("session-culture");
+        when(conversationMemory.getRecentMessages("session-culture")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("문화", 3, null)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("문화", List.of(), policies))
+                .thenReturn(new ChatbotAiResult("문화 관련 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-culture", "문화");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void askSearchesAgeBenefitQuestionWithAgeFilter() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-middle-age",
+                        "Middle-aged Support",
+                        "Supports middle-aged residents.",
+                        "50 or older",
+                        "Benefit support",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-middle-age",
+                        "Seoul",
+                        "Welfare Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-fifties")).thenReturn("session-fifties");
+        when(conversationMemory.getRecentMessages("session-fifties")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("혹시 50대 이상이 받을 수 있는 것도 있어? 중장년 50세", 3, 50)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("혹시 50대 이상이 받을 수 있는 것도 있어?", List.of(), policies))
+                .thenReturn(new ChatbotAiResult("50대 이상이 받을 수 있는 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-fifties", "혹시 50대 이상이 받을 수 있는 것도 있어?");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+        assertEquals("50대 이상이 받을 수 있는 정책을 찾았어요.", response.answer());
+        verify(policySearchService).searchPolicies("혹시 50대 이상이 받을 수 있는 것도 있어? 중장년 50세", 3, 50);
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void askAppliesAgeFilterWhenAgeAndStartupTopicAreInSameMessage() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup-50",
+                        "중장년 창업 지원",
+                        "50대 이상 창업자를 지원합니다.",
+                        "50대 이상 예비창업자",
+                        "창업 컨설팅 및 사업화 자금 지원",
+                        "온라인 신청",
+                        "상시",
+                        "https://example.com/policies/svc-startup-50",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-fifties-startup")).thenReturn("session-fifties-startup");
+        when(conversationMemory.getRecentMessages("session-fifties-startup")).thenReturn(List.of());
+        when(policySearchService.searchPolicies("50대 이상한테는 창업 관련 정책이 별로 없어? 중장년 50세", 3, 50))
+                .thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("50대 이상한테는 창업 관련 정책이 별로 없어?", List.of(), policies))
+                .thenReturn(new ChatbotAiResult("50대 이상 창업 관련 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-fifties-startup", "50대 이상한테는 창업 관련 정책이 별로 없어?");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+        assertEquals("50대 이상 창업 관련 정책을 찾았어요.", response.answer());
+        verify(policySearchService).searchPolicies("50대 이상한테는 창업 관련 정책이 별로 없어? 중장년 50세", 3, 50);
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void askUsesRecentPolicyContextWhenUserRequestsMoreResults() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup-50",
+                        "중장년 창업 지원",
+                        "50대 이상 창업자를 지원합니다.",
+                        "50대 이상 예비창업자",
+                        "창업 컨설팅 및 사업화 자금 지원",
+                        "온라인 신청",
+                        "상시",
+                        "https://example.com/policies/svc-startup-50",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+        ChatbotConversationMessage previousUserMessage = new ChatbotConversationMessage("user", "50대 창업 정책 알려줘");
+        ChatbotConversationMessage previousAssistantMessage = new ChatbotConversationMessage("assistant", "창업과 관련된 정책을 찾아봤어요.");
+
+        when(conversationMemory.resolveSessionId("session-more")).thenReturn("session-more");
+        when(conversationMemory.getRecentMessages("session-more"))
+                .thenReturn(List.of(previousUserMessage, previousAssistantMessage));
+        when(policySearchService.searchPolicies("50대 창업 정책 알려줘 중장년 50세", 5, 50))
+                .thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("50대 창업 정책 알려줘", List.of(previousUserMessage, previousAssistantMessage), policies))
+                .thenReturn(new ChatbotAiResult("창업 관련 정책을 더 찾아봤어요.", List.of()));
+
+        ChatbotAskResponse response = chatbotService.ask("session-more", "한 5개만 더 보여줘");
+
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, response.responseType());
+        assertEquals(1, response.matchedPolicyCount());
+        assertEquals("창업 관련 정책을 더 찾아봤어요.", response.answer());
+        verify(policySearchService).searchPolicies("50대 창업 정책 알려줘 중장년 50세", 5, 50);
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void askStartsClarificationFlowForAmbiguousHardshipMessage() {
         when(conversationMemory.resolveSessionId("session-2")).thenReturn("session-2");
         when(conversationMemory.getRecentMessages("session-2")).thenReturn(List.of());
@@ -238,6 +453,57 @@ class ChatbotServiceTest {
         assertTrue(secondResponse.answer().contains("혼자"));
         assertEquals(ChatbotResponseType.POLICY_SEARCH, thirdResponse.responseType());
         verify(policySearchService).searchPolicies("나는 너무 가난한 것 같아 청년 25세 1인 가구", 3, 25);
+    }
+
+    @Test
+    void askTreatsStandaloneKoreanAgeAsProfileContext() {
+        when(conversationMemory.resolveSessionId("session-korean-age")).thenReturn("session-korean-age");
+        when(conversationMemory.getRecentMessages("session-korean-age"))
+                .thenReturn(List.of(new ChatbotConversationMessage("assistant", "청년 지원금, 주거 지원, 취업 지원처럼 말씀해 주세요.")));
+
+        ChatbotAskResponse response = chatbotService.ask("session-korean-age", "내가 지금 스무살이야");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, response.responseType());
+        assertTrue(response.answer().contains("20살이면"));
+        assertTrue(response.answer().contains("어떤 분야가 궁금하세요"));
+        assertEquals(0, response.matchedPolicyCount());
+        assertEquals(4, response.suggestedReplies().size());
+        verify(policySearchService, never()).searchPolicies(anyString(), eq(3));
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void askSearchesCategoryAnswerAfterStandaloneAge() {
+        List<PolicySearchResultDto> policies = List.of(
+                new PolicySearchResultDto(
+                        "svc-startup",
+                        "Youth Startup Support",
+                        "Supports young founders.",
+                        "Young founders",
+                        "Startup grants",
+                        "Online application",
+                        "Always open",
+                        "https://example.com/policies/svc-startup",
+                        "Seoul",
+                        "Startup Team"
+                )
+        );
+
+        when(conversationMemory.resolveSessionId("session-age-category")).thenReturn("session-age-category");
+        when(conversationMemory.getRecentMessages("session-age-category"))
+                .thenReturn(List.of(new ChatbotConversationMessage("assistant", "청년 지원금, 주거 지원, 취업 지원처럼 말씀해 주세요.")));
+        when(policySearchService.searchPolicies("창업 청년 20세", 3, 20)).thenReturn(policies);
+        when(chatbotAiClient.generateAnswer("창업", List.of(new ChatbotConversationMessage("assistant", "청년 지원금, 주거 지원, 취업 지원처럼 말씀해 주세요.")), policies))
+                .thenReturn(new ChatbotAiResult("청년 창업 지원 정책을 찾았어요.", List.of()));
+
+        ChatbotAskResponse firstResponse = chatbotService.ask("session-age-category", "내가 지금 스무살이야");
+        ChatbotAskResponse secondResponse = chatbotService.ask("session-age-category", "창업");
+
+        assertEquals(ChatbotResponseType.CLARIFICATION_NEEDED, firstResponse.responseType());
+        assertEquals(ChatbotResponseType.POLICY_SEARCH, secondResponse.responseType());
+        assertEquals(1, secondResponse.matchedPolicyCount());
+        verify(policySearchService).searchPolicies("창업 청년 20세", 3, 20);
+        verify(chatbotAiClient, never()).classifyIntent(anyString(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
