@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: ZoopZoop_DB
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: sjs5382352
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zoopzoop-local-password}
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d
     restart: on-failure
