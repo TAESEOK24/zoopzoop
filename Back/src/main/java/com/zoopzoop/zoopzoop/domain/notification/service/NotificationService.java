@@ -123,9 +123,7 @@ public class NotificationService {
         setting.update(
                 request.deadlineSoon(),
                 request.newPolicy(),
-                request.recommendedPolicy(),
-                request.browser(),
-                request.email()
+                request.recommendedPolicy()
         );
 
         return NotificationSettingsResponse.from(setting);
