@@ -45,12 +45,6 @@ public class NotificationSetting {
     private boolean recommendedPolicyEnabled;
 
     @Column(nullable = false)
-    private boolean browserEnabled;
-
-    @Column(nullable = false)
-    private boolean emailEnabled;
-
-    @Column(nullable = false)
     private boolean quietHoursEnabled;
 
     @Column(nullable = false)
@@ -65,8 +59,6 @@ public class NotificationSetting {
                 .deadlineSoonEnabled(true)
                 .newPolicyEnabled(true)
                 .recommendedPolicyEnabled(true)
-                .browserEnabled(true)
-                .emailEnabled(false)
                 .quietHoursEnabled(false)
                 .build();
     }
@@ -74,15 +66,11 @@ public class NotificationSetting {
     public void update(
             boolean deadlineSoonEnabled,
             boolean newPolicyEnabled,
-            boolean recommendedPolicyEnabled,
-            boolean browserEnabled,
-            boolean emailEnabled
+            boolean recommendedPolicyEnabled
     ) {
         this.deadlineSoonEnabled = deadlineSoonEnabled;
         this.newPolicyEnabled = newPolicyEnabled;
         this.recommendedPolicyEnabled = recommendedPolicyEnabled;
-        this.browserEnabled = browserEnabled;
-        this.emailEnabled = emailEnabled;
         this.quietHoursEnabled = false;
     }
 

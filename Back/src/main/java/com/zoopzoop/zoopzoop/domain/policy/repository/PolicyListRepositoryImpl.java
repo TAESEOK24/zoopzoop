@@ -152,7 +152,7 @@ public class PolicyListRepositoryImpl implements PolicyListRepositoryCustom {
             if (!criteria.specialCodes().isEmpty()) {
                 List<Predicate> specialPredicates = criteria.specialCodes().stream()
                         .filter(SPECIAL_FIELDS::contains)
-                        .map(code -> isEnabled(cb, conditionsRoot.get(code)))
+                        .map(code -> specialPredicate(code, cb, conditionsRoot))
                         .toList();
 
                 if (!specialPredicates.isEmpty()) {
@@ -176,6 +176,32 @@ public class PolicyListRepositoryImpl implements PolicyListRepositoryCustom {
                 cb.notEqual(normalized, "N"),
                 cb.notEqual(normalized, "0"),
                 cb.notEqual(normalized, "FALSE")
+        );
+    }
+
+    private Predicate specialPredicate(String code, CriteriaBuilder cb, Root<PolicyConditions> conditionsRoot) {
+        Predicate enabled = isEnabled(cb, conditionsRoot.get(code));
+
+        return switch (code) {
+            case "ja0317" -> cb.and(enabled, overlapsAgeRange(cb, conditionsRoot, 7, 12));
+            case "ja0318" -> cb.and(enabled, overlapsAgeRange(cb, conditionsRoot, 13, 15));
+            case "ja0319" -> cb.and(enabled, overlapsAgeRange(cb, conditionsRoot, 16, 18));
+            default -> enabled;
+        };
+    }
+
+    private Predicate overlapsAgeRange(
+            CriteriaBuilder cb,
+            Root<PolicyConditions> conditionsRoot,
+            int targetMinAge,
+            int targetMaxAge
+    ) {
+        Path<Integer> minAge = conditionsRoot.get("ja0110");
+        Path<Integer> maxAge = conditionsRoot.get("ja0111");
+
+        return cb.and(
+                cb.or(cb.isNull(minAge), cb.lessThanOrEqualTo(minAge, targetMaxAge)),
+                cb.or(cb.isNull(maxAge), cb.greaterThanOrEqualTo(maxAge, targetMinAge))
         );
     }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BadgePlus, Bell, ChevronLeft, Clock, Mail, Monitor, Save, Sparkles } from 'lucide-react';
+import { BadgePlus, Bell, ChevronLeft, Clock, Save, Sparkles } from 'lucide-react';
 import { fetchNotificationSettings, updateNotificationSettings } from '../../api/notifications';
 import { getAccessToken } from '../../api/authSession';
 
@@ -8,8 +8,6 @@ const DEFAULT_SETTINGS = {
     deadlineSoon: true,
     newPolicy: true,
     recommendedPolicy: true,
-    browser: true,
-    email: false,
 };
 
 const NotificationSettings = () => {
@@ -66,7 +64,12 @@ const NotificationSettings = () => {
 
     const handleSave = async () => {
         try {
-            const result = await updateNotificationSettings(settings);
+            const result = await updateNotificationSettings({
+                deadlineSoon: settings.deadlineSoon,
+                newPolicy: settings.newPolicy,
+                recommendedPolicy: settings.recommendedPolicy,
+            });
+
             setSettings({
                 ...DEFAULT_SETTINGS,
                 ...(result?.data ?? {}),
@@ -106,7 +109,7 @@ const NotificationSettings = () => {
                                 </div>
                                 <h1 className="text-3xl font-black tracking-tight text-gray-900">알림 설정</h1>
                                 <p className="mt-2 text-sm font-medium text-gray-500">
-                                    받고 싶은 정책 알림과 수신 방식을 선택하세요.
+                                    받고 싶은 정책 알림 종류를 선택하세요.
                                 </p>
                             </div>
                             <button
@@ -152,28 +155,6 @@ const NotificationSettings = () => {
                                 />
                             </div>
                         </section>
-
-                        <section>
-                            <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-gray-400">수신 방식</h2>
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <SettingRow
-                                    compact
-                                    icon={Monitor}
-                                    title="브라우저 알림"
-                                    description="서비스 이용 중 알림을 표시합니다."
-                                    checked={settings.browser}
-                                    onToggle={() => handleToggle('browser')}
-                                />
-                                <SettingRow
-                                    compact
-                                    icon={Mail}
-                                    title="이메일 알림"
-                                    description="가입 이메일로 알림을 받습니다."
-                                    checked={settings.email}
-                                    onToggle={() => handleToggle('email')}
-                                />
-                            </div>
-                        </section>
                     </div>
                 </div>
             </div>
@@ -181,8 +162,8 @@ const NotificationSettings = () => {
     );
 };
 
-const SettingRow = ({ icon: Icon, title, description, checked, onToggle, compact = false }) => (
-    <div className={`flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white shadow-sm ${compact ? 'p-4' : 'p-5'}`}>
+const SettingRow = ({ icon: Icon, title, description, checked, onToggle }) => (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="flex min-w-0 items-start gap-3">
             <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                 <Icon className="h-5 w-5" />
