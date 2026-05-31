@@ -484,7 +484,7 @@ const PolicyPage = () => {
                                                         : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                                                 }`}
                                             >
-                                                {item.type} {item.count.toLocaleString()}
+                                                {item.type}
                                             </button>
                                         ))}
                                     </div>
