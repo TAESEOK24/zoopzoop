@@ -118,7 +118,6 @@ const Header = () => {
                 <Link to="/ai-chat" className="hover:text-blue-500 transition-colors">AI채팅</Link>
                 <Link to="/community" className="hover:text-blue-500 transition-colors">커뮤니티</Link>
                 <Link to="/policies" className="hover:text-blue-500 transition-colors">정책목록</Link>
-                <Link to="/support" className="hover:text-blue-500 transition-colors">고객센터</Link>
             </nav>
 
             <div className="flex items-center space-x-4">
